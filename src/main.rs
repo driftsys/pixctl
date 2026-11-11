@@ -1,7 +1,5 @@
-mod cli;
-
 use clap::Parser;
-use cli::{Cli, Command};
+use pixctl::cli::{Cli, Command};
 
 const TRACKING: &str = "https://github.com/driftsys/pixctl/issues/1";
 
