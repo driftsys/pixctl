@@ -23,7 +23,13 @@ document fixes the decisions that issue leaves open and orders the work.
 5. **`needs-review` is not a failure.** `check` prints `REVIEW` and still exits
    `0`, while `--strict` turns REVIEW into FAIL (exit `1`). Unknown font size
    must not break CI on day one.
-6. **EMF/WMF are deferred.** In the MVP they are reported as unsupported (exit
+6. **Single crate for now.** Modules keep pure interfaces (notably
+   `font::estimate`) so the contract and the estimator can be extracted into
+   crates later, when diagctl or tblctl consume them.
+7. **Libraries.** `image` (decode, greyscale), `imageproc` (Otsu threshold,
+   connected components), `oxipng`; `ab_glyph` as a dev-dependency. Line
+   grouping, median height and confidence are hand-rolled.
+8. **EMF/WMF are deferred.** In the MVP they are reported as unsupported (exit
    `2` for that file). WebP output is also deferred to the last milestone.
 
 ## Units
@@ -77,6 +83,21 @@ compares the bytes.
 - The estimator must land within ±1.5 px on the generated fixtures at 11 px and
   above, and produce `needs-review` on noise and photos.
 - Strict TDD per milestone.
+
+## Corpus
+
+- **Synthetic (M1):** generated at test time with `ab_glyph` and open fonts
+  (DejaVu, Liberation, Noto) at 8–24 px. It varies layout, inverted colours,
+  alpha, JPEG artefacts and 0.5×/1.5× scaling. It calibrates `k` and the
+  confidence thresholds.
+- **Real public (M2):** about 20 open-licence screenshots in
+  `tests/fixtures/real/`. A `manifest.toml` holds each file's source, licence
+  and expected font range, or `review`.
+- **Private:** `just eval DIR` runs against a local, uncommitted corpus and
+  prints aggregate metrics only.
+- **Metrics:** mean and p95 error on confident results, the `needs-review`
+  share, and the confidently wrong rate (off by more than 2 px), which must stay
+  below 2%.
 
 ## Milestones (one PR each)
 
