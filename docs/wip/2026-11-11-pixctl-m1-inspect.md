@@ -43,19 +43,25 @@ heuristic", "Commands", "Testing", "Corpus"). Issue:
 
 The spec leaves these open. The plan fixes them; the reviewer should check them.
 
-1. **Rule values:** `icon` (max(w,h) ≤ 64), `oversize` (w > 766, or an upscale
-   that cannot fit), `upscale` (factor 1.5 or 2), `unchanged`.
-2. **Unknown font:** when no font size is known, no font-driven upscale is
-   chosen. The rule comes from the width alone (`unchanged` or `oversize`).
-3. **Output width:** `round(w × factor) + 2 × (16 + 1)`; for `icon` it is `w`
+1. **Rule values:** `icon` (max(w,h) ≤ 64), `oversize` (w > 766 only), `upscale`
+   (factor 1.5 or 2), `too-small` (the font is below 11 px and no allowed factor
+   brings it to 11 px within 766 px), `unchanged`.
+2. **Upscale trigger:** an upscale is considered only when the font is below
+   `F = 11` px. A font in [11, 12) px is `unchanged`; 12 px stays the target
+   that sizes the factor.
+3. **Unknown or low-confidence font:** when no font size is known, or the
+   estimate has `Low` confidence and no `--font-px` is given, no font-driven
+   upscale is chosen. The rule comes from the width alone (`unchanged` or
+   `oversize`).
+4. **Output width:** `round(w × factor) + 2 × (16 + 1)`; for `icon` it is `w`
    (icons are only flattened, never padded).
-4. **Font px means em size** in CSS terms, not ascent + descent. The fixture
+5. **Font px means em size** in CSS terms, not ascent + descent. The fixture
    generator converts accordingly (see Task 3).
-5. **Fixtures for load tests** are generated into a temp directory at test time
+6. **Fixtures for load tests** are generated into a temp directory at test time
    instead of committed binaries (the spec says "small committed fixtures"; M2
    commits the real corpus). Generation keeps the repo free of binaries and
    keeps each test self-describing.
-6. **JSON** is an array with one object per successfully inspected image;
+7. **JSON** is an array with one object per successfully inspected image;
    failures go to stderr only.
 
 ## Review Focus
@@ -255,7 +261,8 @@ overlap into lines (line height = min top to max bottom of its members) →
 
 - Consumes: `load::load`, `font::estimate`, `contract::*`.
 - Produces:
-  - `rule::Rule { Icon, Unchanged, Upscale, Oversize }` (serde `lowercase`),
+  - `rule::Rule { Icon, Unchanged, Upscale, TooSmall, Oversize }` (serde
+    `kebab-case`),
     `rule::Plan { pub rule: Rule, pub factor: f32, pub output_width: u32 }`,
     `rule::plan(w: u32, h: u32, font_px: Option<f32>) -> Plan` (pure; alpha does
     not influence the rule in M1, so it is not a parameter).
@@ -268,11 +275,15 @@ overlap into lines (line height = min top to max bottom of its members) →
     — returns `0`, or `2` if any file failed.
   - CLI: `--font-px <F>` accepts a finite `f32` > 0 only (clap `value_parser`).
 
-`plan` rules, in order: `max(w,h) ≤ 64` → `Icon`, factor 1, width `w`. `w > 766`
-→ `Oversize`, factor 1. Font `None` or `needed ≤ 1` → `Unchanged`, factor 1.
-Otherwise `needed = min(766 ÷ w, 12 ÷ font)`; choose the smallest of {1.5, 2}
-that is ≥ `needed` (2 when `needed > 2`); if `w × chosen > 766` fall back to
-1.5; if `w × 1.5 > 766` → `Oversize`, factor 1; else `Upscale`.
+`plan` takes the font only when it is usable: the caller passes `None` for a
+`Low`-confidence estimate unless `--font-px` was given. Rules, in order:
+`max(w,h) ≤ 64` → `Icon`, factor 1, width `w`. `w > 766` → `Oversize`, factor 1.
+Font `None` or font ≥ 11 → `Unchanged`, factor 1. Otherwise
+`needed = min(766 ÷
+w, 12 ÷ font)`; choose the smallest of {1.5, 2} that is ≥
+`needed` (2 when `needed > 2`); if `w × chosen > 766` fall back to 1.5; if
+`w × 1.5 > 766` → `TooSmall`, factor 1; if `font × chosen < 11` → `TooSmall`,
+factor 1; else `Upscale`.
 
 - [ ] **Step 1: Failing unit tests for `plan`** (in `src/rule.rs`):
   - `icon_64_is_icon_65_is_not`: `(64, 10, None)` → `Icon`; `(65, 10, None)` is
@@ -280,12 +291,16 @@ that is ≥ `needed` (2 when `needed > 2`); if `w × chosen > 766` fall back to
   - `width_767_is_oversize_766_is_not`.
   - `font_none_never_upscales`: `(300, 200, None)` → `Unchanged`, factor 1.
   - `font_12_or_more_is_unchanged`: `(300, 200, Some(12.0))`.
+  - `font_11_5_wide_is_unchanged`: `(600, 200, Some(11.5))` → `Unchanged`, not
+    `Oversize` or `TooSmall`.
+  - `font_5_gives_too_small`: `(300, 200, Some(5.0))` → 2× gives 10 px < 11 →
+    `TooSmall`, factor 1.
   - `font_8_at_300_wide_gives_1_5x`: needed `min(2.55, 1.5)` = 1.5 → factor 1.5,
     `output_width == 450 + 34`. And `font_6_at_300_wide_gives_2x`: needed
     `min(2.55, 2)` = 2 → factor 2, width `600 + 34`.
   - `two_x_falls_back_to_1_5`: `(400, 200, Some(6.0))`: 2× = 800 > 766, 1.5× =
     600 → factor 1.5.
-  - `even_1_5_overflows_is_oversize`: `(600, 200, Some(6.0))` → `Oversize`,
+  - `even_1_5_overflows_is_too_small`: `(600, 200, Some(6.0))` → `TooSmall`,
     factor 1.
 - [ ] **Step 2:** Run → fails. **Step 3:** implement `plan`. **Step 4:** pass.
 - [ ] **Step 5: Failing CLI tests** in `tests/inspect.rs` (generate images into
@@ -307,7 +322,8 @@ missing.png a.emf good2.png` → exit `2`; stdout JSON
     has 2 entries; stderr names each of the 3 bad files.
   - Review Focus 5: `font_px_rejects_zero_negative_and_text`: `0`, `-3`, `abc` →
     exit `2`, stderr non-empty.
-  - `needs_review_still_exits_zero`: noise image → exit `0`.
+  - `needs_review_still_exits_zero`: noise image → exit `0`, and `rule` is
+    `unchanged` (a low-confidence estimate never drives an upscale).
 - [ ] **Step 6:** Run `cargo test --test inspect` → fails.
 - [ ] **Step 7:** Implement `inspect::run` and wire `main.rs`. Flatten RGBA onto
       white before converting to greyscale. With `--font-px N`, `confidence` is

@@ -15,11 +15,14 @@ document fixes the decisions that issue leaves open and orders the work.
    mechanism.
 3. **The padding and frame count inside the column.** The content width budget
    is `C − 2 × (16 + 1) = 766 px`.
-4. **The upscale factor is 1.5 or 2.** The needed factor is
-   `min(766 ÷ w, 12 ÷ font)`. The tool picks the smallest of {1.5, 2} that is ≥
-   the needed factor, caps it at 2, and drops to 1.5 when 2 would exceed 766 px.
-   If even 1.5 overflows, it does not upscale, and the image is flagged. 2× uses
-   nearest-neighbour and 1.5× uses Lanczos3.
+4. **The upscale factor is 1.5 or 2.** An upscale is considered only when the
+   font is below 11 px and the font size is known with high confidence (or set
+   by `--font-px`). The needed factor is `min(766 ÷ w, 12 ÷ font)`. The tool
+   picks the smallest of {1.5, 2} that is ≥ the needed factor, caps it at 2, and
+   drops to 1.5 when 2 would exceed 766 px. If even 1.5 overflows, or the chosen
+   factor still leaves the font below 11 px, it does not upscale, and the image
+   is flagged `too-small`. `oversize` means only that the image is wider than
+   766 px. 2× uses nearest-neighbour and 1.5× uses Lanczos3.
 5. **`needs-review` is not a failure.** `check` prints `REVIEW` and still exits
    `0`, while `--strict` turns REVIEW into FAIL (exit `1`). Unknown font size
    must not break CI on day one.
