@@ -46,12 +46,13 @@ cargo install pixctl
 ## Usage
 
 ```sh
-pixctl inspect <image>... [--json] [--font-px N]
+pixctl inspect <image>... [--json] [--font-px F]
 ```
 
 `inspect` reports, for each image, its size, whether it has transparent pixels,
 an estimated font size of the text in it, and the rule that `fit` would apply.
-`--font-px N` replaces the estimate with a given font size in pixels.
+`--font-px F` replaces the estimate with a given font size in pixels. F is a
+positive number and may be a decimal, such as `10.5`.
 
 Without `--json`, it prints one line per image. With `--json`, it prints a
 pretty-printed array with one object per image that loaded:
@@ -83,7 +84,8 @@ $ pixctl inspect --json blank.png
   or `override` when `--font-px` is given.
 - `rule` is one of `icon`, `unchanged`, `upscale`, `too-small` or `oversize`.
   `factor` is the scale factor and `output_width` the width in pixels of the
-  fitted image.
+  fitted image. `oversize` images are not scaled, so their `output_width` is
+  wider than the 800 px column.
 - An image that fails to load is reported on stderr and left out of the output.
   The exit code is `2` when any image fails.
 
