@@ -8,6 +8,7 @@ repository = "https://github.com/driftsys/pixctl"
 readme = "README.md"
 keywords = ["cli", "image", "png", "markdown", "documentation"]
 categories = ["command-line-utilities"]
+exclude = ["tests/fonts"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
