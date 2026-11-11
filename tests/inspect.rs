@@ -100,6 +100,7 @@ fn font_px_override() {
     assert_eq!(r["font"]["glyphs"], 0);
     assert_eq!(r["rule"], "upscale");
     assert_eq!(r["factor"].as_f64(), Some(1.5));
+    assert_eq!(r["output_width"].as_u64(), Some(484));
 }
 
 #[test]
