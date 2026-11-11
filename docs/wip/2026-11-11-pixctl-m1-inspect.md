@@ -18,8 +18,8 @@ pure functions. A test-only fixture generator renders known text with
 `anyhow`, `image`, `imageproc`, `serde` + `serde_json`; dev: `ab_glyph`,
 `tempfile`, `assert_cmd`, `predicates`. `oxipng` is not needed before M3.
 
-**Spec:** `docs/superpowers/specs/2026-11-11-pixctl-mvp-design.md` (decisions
-1–8, "Font heuristic", "Commands", "Testing", "Corpus"). Issue:
+**Spec:** `docs/wip/2026-11-11-pixctl-mvp-design.md` (decisions 1–8, "Font
+heuristic", "Commands", "Testing", "Corpus"). Issue:
 [pixctl#1](https://github.com/driftsys/pixctl/issues/1).
 
 ## Global Constraints
@@ -179,10 +179,11 @@ skeleton` (deps in the
 font.units_per_em().unwrap())`,
   so `em_px` is the CSS-like em size.
 
-- [ ] **Step 1:** Download the three open-licence fonts from their upstream
-      releases (DejaVu: Bitstream Vera licence; Liberation and Noto: SIL OFL
-      1.1). Store each licence text beside the font. Write
-      `tests/fonts/README.md` with source URL, version and `sha256` per file.
+- [ ] **Step 1:** Copy `DejaVuSans.ttf` and `LICENSE-DejaVu.txt` from
+      `driftsys/diagctl` (`assets/fonts/`). Download Liberation Sans and Noto
+      Sans Regular from their upstream releases (SIL OFL 1.1) and store each
+      licence text beside its font. Write `tests/fonts/README.md` with source,
+      version and `sha256` per file.
 - [ ] **Step 2: Failing tests** in `tests/support_selftest.rs`:
   - `render_text_has_ink_and_is_deterministic`: two renders of the same spec are
     byte-equal and contain both black and white pixels.
@@ -326,7 +327,10 @@ missing.png a.emf good2.png` → exit `2`; stdout JSON
 - [ ] **Step 1:** Update both files; as-built facts only, no promises about M2+.
 - [ ] **Step 2:** `just fmt`, then `just build` and `just verify` → both pass.
 - [ ] **Step 3: Commit** `docs(docs): document the inspect command`.
-- [ ] **Step 4:** Push the branch and open a non-draft PR to `main` (title
+- [ ] **Step 4:** Run the `sdd-gardening` skill so `docs/wip/` is empty (the
+      spec and this plan move to the durable `docs/` records and
+      `docs/archive/`).
+- [ ] **Step 5:** Push the branch and open a non-draft PR to `main` (title
       `feat(inspect): M1 inspect command`). The PR body states that it carries
       the MVP design commits, so pixctl#3 can be closed once this PR merges. Ask
       the user before any `--admin` merge.
