@@ -3,7 +3,6 @@
 //! The estimate is the median height of the text lines, scaled by [`K`].
 
 use image::{GrayImage, Luma};
-use imageproc::contrast::otsu_level;
 use imageproc::region_labelling::{connected_components, Connectivity};
 use serde::Serialize;
 
@@ -15,7 +14,7 @@ use serde::Serialize;
 /// | face       | min    | median | max    |
 /// |------------|--------|--------|--------|
 /// | DejaVu     | 0.9583 | 1.0000 | 1.0000 |
-/// | Liberation | 0.9000 | 0.9435 | 0.9583 |
+/// | Liberation | 0.9000 | 0.9416 | 0.9583 |
 /// | Noto       | 1.0000 | 1.0000 | 1.0455 |
 /// | all        | 0.9000 | 1.0000 | 1.0455 |
 ///
@@ -26,16 +25,15 @@ use serde::Serialize;
 /// Rule: `K` is the midpoint of the interval of `K` values that keeps every
 /// one of these fixtures within 1.5 px of its em size, rounded to 3
 /// decimals. The lower bound is 18.5 / 18 = 1.0278 (Liberation at 20 px,
-/// line height 18 px). The upper bound is 25.5 / 24 = 1.0625 (Noto at 24
-/// px, line height 24 px). The
-/// midpoint is 1.0451.
+/// line height 18 px). The upper bound is 25.5 / 24 = 1.0625 (Noto at
+/// 24 px, line height 24 px). The midpoint is 1.0451.
 pub const K: f32 = 1.045;
 /// Fewest text lines needed for a high-confidence estimate.
 pub const MIN_LINES: usize = 3;
 /// Fewest glyph-like components needed for a high-confidence estimate.
 pub const MIN_GLYPHS: usize = 20;
-/// Largest coefficient of variation of the line heights for a
-/// high-confidence estimate.
+/// Coefficient of variation of the line heights that a high-confidence
+/// estimate must stay below.
 pub const MAX_CV: f32 = 0.35;
 
 /// How much the estimate can be trusted.
@@ -83,7 +81,7 @@ pub fn estimate(img: &GrayImage) -> FontEstimate {
     };
     let confident = lines.len() >= MIN_LINES
         && glyphs.len() >= MIN_GLYPHS
-        && coefficient_of_variation(&heights) <= MAX_CV;
+        && coefficient_of_variation(&heights) < MAX_CV;
     FontEstimate {
         px: Some(median * K),
         confidence: if confident {
@@ -155,6 +153,52 @@ fn group_lines(glyphs: &[Span]) -> Vec<Span> {
     lines
 }
 
+/// Otsu threshold of `img`, with the same result as
+/// `imageproc::contrast::otsu_level`: pixels above the level form one class.
+fn otsu_level(img: &GrayImage) -> u8 {
+    let mut hist = [0u64; 256];
+    for p in img.pixels() {
+        hist[p.0[0] as usize] += 1;
+    }
+    otsu_from_histogram(&hist)
+}
+
+/// Otsu threshold of a 256-bin histogram. Counts are `u64` and sums are
+/// `f64`, so no image size overflows the computation.
+fn otsu_from_histogram(hist: &[u64; 256]) -> u8 {
+    let total: u64 = hist.iter().sum();
+    let total_sum: f64 = hist
+        .iter()
+        .enumerate()
+        .map(|(t, &h)| t as f64 * h as f64)
+        .sum();
+    let mut background_weight = 0u64;
+    let mut background_sum = 0f64;
+    let mut largest_variance = 0f64;
+    let mut best = 0u8;
+    for (t, &h) in hist.iter().enumerate() {
+        background_weight += h;
+        if background_weight == 0 {
+            continue;
+        }
+        let foreground_weight = total - background_weight;
+        if foreground_weight == 0 {
+            break;
+        }
+        background_sum += t as f64 * h as f64;
+        let background_mean = background_sum / background_weight as f64;
+        let foreground_mean = (total_sum - background_sum) / foreground_weight as f64;
+        let variance = background_weight as f64
+            * foreground_weight as f64
+            * (background_mean - foreground_mean).powi(2);
+        if variance > largest_variance {
+            largest_variance = variance;
+            best = t as u8;
+        }
+    }
+    best
+}
+
 fn median(values: &mut [f32]) -> Option<f32> {
     if values.is_empty() {
         return None;
@@ -173,4 +217,36 @@ fn coefficient_of_variation(values: &[f32]) -> f32 {
     let mean = values.iter().sum::<f32>() / n;
     let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / n;
     variance.sqrt() / mean
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn otsu_matches_imageproc_on_normal_images() {
+        let bimodal = GrayImage::from_fn(97, 61, |x, y| {
+            let dark = (x / 7 + y / 5) % 3 == 0;
+            Luma([if dark {
+                40 + (x % 9) as u8
+            } else {
+                210 - (y % 13) as u8
+            }])
+        });
+        let gradient = GrayImage::from_fn(256, 3, |x, y| Luma([(x as u8).wrapping_add(y as u8)]));
+        for img in [bimodal, gradient] {
+            assert_eq!(otsu_level(&img), imageproc::contrast::otsu_level(&img));
+        }
+    }
+
+    #[test]
+    fn otsu_handles_counts_above_u32() {
+        // Twenty billion pixels near white and five billion near black:
+        // the products of intensity and count exceed u32::MAX.
+        let mut hist = [0u64; 256];
+        hist[250] = 20_000_000_000;
+        hist[10] = 5_000_000_000;
+        let level = otsu_from_histogram(&hist);
+        assert!((10..250).contains(&level), "{level}");
+    }
 }

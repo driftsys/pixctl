@@ -95,3 +95,22 @@ fn few_lines_is_low_confidence() {
     let est = estimate(&render_text(&spec(Face::DejaVu, 14.0, 2, false)));
     assert_eq!(est.confidence, Confidence::Low);
 }
+
+#[test]
+fn mixed_line_heights_are_low_confidence() {
+    // Three lines at 11 px above three lines at 24 px: line heights have a
+    // coefficient of variation of about 0.37, above `MAX_CV`.
+    let small = render_text(&spec(Face::DejaVu, 11.0, 3, false));
+    let large = render_text(&spec(Face::DejaVu, 24.0, 3, false));
+    let mut img = image::GrayImage::from_pixel(
+        small.width().max(large.width()),
+        small.height() + large.height(),
+        image::Luma([255]),
+    );
+    image::imageops::replace(&mut img, &small, 0, 0);
+    image::imageops::replace(&mut img, &large, 0, small.height() as i64);
+    let est = estimate(&img);
+    assert_eq!(est.lines, 6, "{est:?}");
+    assert!(est.glyphs >= 20, "{est:?}");
+    assert_eq!(est.confidence, Confidence::Low, "{est:?}");
+}
