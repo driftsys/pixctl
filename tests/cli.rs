@@ -28,7 +28,6 @@ fn help_lists_all_subcommands() {
 #[test]
 fn stubs_exit_2_with_tracking_link() {
     for args in [
-        &["inspect", "a.png", "--json"][..],
         &["fit", "a.png", "--out", "out"][..],
         &["check", "a.png"][..],
     ] {

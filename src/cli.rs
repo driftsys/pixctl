@@ -14,13 +14,16 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// (not yet implemented) Report size, alpha, estimated font size and rule
+    /// Report size, alpha, estimated font size and rule
     Inspect {
         #[arg(required = true)]
         images: Vec<PathBuf>,
         /// Emit JSON
         #[arg(long)]
         json: bool,
+        /// Use this font size in pixels instead of the estimate
+        #[arg(long, value_name = "F", value_parser = parse_font_px)]
+        font_px: Option<f32>,
     },
     /// (not yet implemented) Convert, scale, flatten, pad and frame images
     Fit {
@@ -52,4 +55,14 @@ pub enum Format {
 #[derive(Clone, Copy, ValueEnum)]
 pub enum Target {
     Markdown,
+}
+
+/// Accepts a finite number greater than zero.
+fn parse_font_px(s: &str) -> Result<f32, String> {
+    let value: f32 = s.parse().map_err(|_| format!("`{s}` is not a number"))?;
+    if value.is_finite() && value > 0.0 {
+        Ok(value)
+    } else {
+        Err(format!("`{s}` must be a finite number greater than 0"))
+    }
 }
