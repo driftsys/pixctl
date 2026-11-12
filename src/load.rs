@@ -130,6 +130,16 @@ mod tests {
     }
 
     #[test]
+    fn wmf_and_upper_case_extensions_are_unsupported() {
+        for name in ["a.wmf", "b.EMF", "c.Wmf"] {
+            let (_d, p) = tmp(name);
+            std::fs::write(&p, b"").unwrap();
+            let err = load(&p).err().expect("emf/wmf must fail");
+            assert!(format!("{err:#}").contains("unsupported"), "{name}");
+        }
+    }
+
+    #[test]
     fn missing_file_error_names_the_path() {
         let (_d, p) = tmp("nope.png");
         let err = load(&p).err().expect("missing file must fail");

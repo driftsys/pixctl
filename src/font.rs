@@ -239,14 +239,80 @@ mod tests {
         }
     }
 
+    /// White image with black rectangles `(x, y, w, h)`.
+    fn boxes(w: u32, h: u32, rects: &[(u32, u32, u32, u32)]) -> GrayImage {
+        let mut img = GrayImage::from_pixel(w, h, Luma([255]));
+        for &(x, y, rw, rh) in rects {
+            for yy in y..y + rh {
+                for xx in x..x + rw {
+                    img.put_pixel(xx, yy, Luma([0]));
+                }
+            }
+        }
+        img
+    }
+
+    /// `rows` lines of `per_row` 6 x 10 px blocks.
+    fn grid(rows: u32, per_row: u32) -> GrayImage {
+        let rects: Vec<_> = (0..rows)
+            .flat_map(|r| (0..per_row).map(move |c| (4 + c * 10, 4 + r * 20, 6, 10)))
+            .collect();
+        boxes(4 + per_row * 10 + 4, 4 + rows * 20 + 4, &rects)
+    }
+
+    #[test]
+    fn fewer_than_20_glyphs_is_low() {
+        let est = estimate(&grid(3, 6));
+        assert_eq!((est.lines, est.glyphs), (3, 18));
+        assert_eq!(est.confidence, Confidence::Low);
+        let est = estimate(&grid(3, 7));
+        assert_eq!((est.lines, est.glyphs), (3, 21));
+        assert_eq!(est.confidence, Confidence::High);
+    }
+
+    #[test]
+    fn three_lines_is_enough() {
+        let est = estimate(&grid(2, 12));
+        assert_eq!((est.lines, est.confidence), (2, Confidence::Low));
+        let est = estimate(&grid(3, 12));
+        assert_eq!((est.lines, est.confidence), (3, Confidence::High));
+    }
+
+    #[test]
+    fn glyph_filters() {
+        // Each case: one component that is (true) or is not (false) a glyph.
+        for (rect, kept) in [
+            ((10, 10, 6, 10), true),    // plain glyph
+            ((10, 10, 2, 4), true),     // area 8, height 4
+            ((10, 10, 1, 5), false),    // area 5
+            ((10, 10, 3, 3), false),    // height 3
+            ((10, 10, 21, 200), true),  // height 200
+            ((10, 10, 21, 201), false), // height 201
+            ((10, 10, 12, 4), true),    // aspect 3
+            ((10, 10, 13, 4), false),   // aspect 3.25
+            ((10, 10, 1, 10), true),    // aspect 0.1
+            ((10, 10, 1, 11), false),   // aspect 0.09
+        ] {
+            let est = estimate(&boxes(60, 230, &[rect]));
+            assert_eq!(est.glyphs, usize::from(kept), "{rect:?}");
+        }
+    }
+
+    #[test]
+    fn touching_glyphs_share_a_line() {
+        // The second glyph starts on the last row of the first one.
+        let est = estimate(&boxes(40, 40, &[(4, 4, 6, 10), (20, 13, 6, 10)]));
+        assert_eq!((est.glyphs, est.lines), (2, 1));
+    }
+
     #[test]
     fn otsu_handles_counts_above_u32() {
-        // Twenty billion pixels near white and five billion near black:
-        // the products of intensity and count exceed u32::MAX.
+        // 17 million white pixels: the sum of intensity x count is
+        // 255 x 17e6 = 4.3e9, above u32::MAX.
         let mut hist = [0u64; 256];
-        hist[250] = 20_000_000_000;
-        hist[10] = 5_000_000_000;
+        hist[255] = 17_000_000;
+        hist[10] = 1_000_000;
         let level = otsu_from_histogram(&hist);
-        assert!((10..250).contains(&level), "{level}");
+        assert!((10..255).contains(&level), "{level}");
     }
 }

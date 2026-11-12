@@ -77,6 +77,7 @@ fn inspect_json_reports_all_fields() {
         assert!(r["font"].get(key).is_some(), "missing font key {key}");
     }
     assert_eq!(r["width"], 700);
+    assert_eq!(r["alpha"], false);
     assert_eq!(r["font"]["source"], "estimate");
     let px = r["font"]["px"].as_f64().expect("font px is a number");
     assert!((px - 14.0).abs() <= 1.5, "px {px}");
@@ -156,7 +157,10 @@ fn bad_file_among_good_ones() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(json_of(&out.stdout).len(), 2);
+    let reports = json_of(&out.stdout);
+    assert_eq!(reports.len(), 2);
+    assert_eq!(reports[0]["path"], good.to_str().unwrap());
+    assert_eq!(reports[1]["path"], good2.to_str().unwrap());
     let stderr = String::from_utf8(out.stderr).unwrap();
     for name in ["corrupt.png", "missing.png", "a.emf"] {
         assert!(stderr.contains(name), "stderr lacks {name}: {stderr}");
@@ -165,14 +169,84 @@ fn bad_file_among_good_ones() {
 
 #[test]
 fn font_px_rejects_zero_negative_and_text() {
+    // The image is valid, so only the `--font-px` value can cause exit 2.
+    let dir = TempDir::new().unwrap();
+    let path = blank_png(dir.path(), "a.png", 300, 200);
     for value in ["0", "-3", "abc", "NaN", "inf"] {
+        // `--font-px=VALUE` makes sure `-3` reaches the value parser.
         let out = pixctl()
-            .args(["inspect", "a.png", "--font-px", value])
+            .args(["inspect", "--json", &format!("--font-px={value}")])
+            .arg(&path)
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(2), "value {value}");
-        assert!(!out.stderr.is_empty(), "value {value}");
+        assert!(out.stdout.is_empty(), "value {value}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("--font-px"),
+            "value {value}"
+        );
     }
+}
+
+#[test]
+fn font_px_replaces_a_high_confidence_estimate() {
+    let dir = TempDir::new().unwrap();
+    let path = text_png(dir.path(), "text.png");
+    let out = pixctl()
+        .args(["inspect", "--json", "--font-px", "8"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let r = &json_of(&out.stdout)[0];
+    assert_eq!(r["font"]["px"].as_f64(), Some(8.0));
+    assert_eq!(r["font"]["source"], "override");
+    // 700 x 1.5 = 1050 px does not fit, so 8 px text is too small.
+    assert_eq!(r["rule"], "too-small");
+}
+
+#[test]
+fn low_confidence_small_font_does_not_upscale() {
+    // Two lines of 8 px text: the estimate is below 11 px but has low
+    // confidence, so it must not select `upscale`.
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("two-lines.png");
+    render_text(&TextSpec {
+        face: Face::DejaVu,
+        em_px: 8.0,
+        lines: 2,
+        invert: false,
+    })
+    .save(&path)
+    .unwrap();
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let r = &json_of(&out.stdout)[0];
+    assert_eq!(r["font"]["confidence"], "low");
+    let px = r["font"]["px"].as_f64().expect("a size is estimated");
+    assert!(px < 11.0, "px {px}");
+    assert_eq!(r["rule"], "unchanged");
+}
+
+#[test]
+fn plain_output_shows_font_and_confidence() {
+    let dir = TempDir::new().unwrap();
+    let path = blank_png(dir.path(), "a.png", 300, 200);
+    let out = pixctl().arg("inspect").arg(&path).output().unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("font=?px (low)"), "{stdout}");
+    let out = pixctl()
+        .args(["inspect", "--font-px", "8"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("font=8.0px (high)"), "{stdout}");
+    assert!(stdout.contains("rule=upscale x1.5 -> 484px"), "{stdout}");
 }
 
 #[test]

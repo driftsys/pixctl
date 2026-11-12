@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn fallback_below_minimum_is_too_small() {
-        // The brief's original fallback case: 6 px x 1.5 = 9 px < 11 px.
+        // 2x = 800 px does not fit, and 6 px x 1.5 = 9 px < 11 px.
         let p = plan(400, 200, Some(6.0));
         assert_eq!(p.rule, Rule::TooSmall);
         assert_eq!(p.factor, 1.0);
@@ -151,5 +151,77 @@ mod tests {
         let p = plan(600, 200, Some(6.0));
         assert_eq!(p.rule, Rule::TooSmall);
         assert_eq!(p.factor, 1.0);
+    }
+
+    #[test]
+    fn readable_after_1_5_but_too_wide_is_too_small() {
+        // 8 px x 1.5 = 12 px is readable, but 600 x 1.5 = 900 px > 766 px.
+        let p = plan(600, 200, Some(8.0));
+        assert_eq!(p.rule, Rule::TooSmall);
+        assert_eq!(p.output_width, 600 + 34);
+        assert_eq!(plan(766, 100, Some(8.0)).rule, Rule::TooSmall);
+    }
+
+    #[test]
+    fn width_limits_of_2x_and_1_5x() {
+        // 383 x 2 = 766 fits; 384 x 2 = 768 does not.
+        let p = plan(383, 100, Some(6.0));
+        assert_eq!(
+            (p.rule, p.factor, p.output_width),
+            (Rule::Upscale, 2.0, 766 + 34)
+        );
+        let p = plan(384, 100, Some(7.5));
+        assert_eq!(
+            (p.rule, p.factor, p.output_width),
+            (Rule::Upscale, 1.5, 576 + 34)
+        );
+        // 510 x 1.5 = 765 fits; 511 x 1.5 = 766.5 does not.
+        assert_eq!(plan(510, 100, Some(8.0)).rule, Rule::Upscale);
+        assert_eq!(plan(511, 100, Some(8.0)).rule, Rule::TooSmall);
+    }
+
+    #[test]
+    fn kept_rules_add_the_border() {
+        assert_eq!(plan(300, 200, None).output_width, 300 + 34);
+        assert_eq!(plan(300, 200, Some(5.0)).output_width, 300 + 34);
+        assert_eq!(plan(900, 200, None).output_width, 900 + 34);
+    }
+
+    #[test]
+    fn tall_narrow_image_is_not_icon() {
+        assert_ne!(plan(10, 65, None).rule, Rule::Icon);
+    }
+
+    #[test]
+    fn oversize_ignores_height() {
+        assert_eq!(plan(300, 2000, None).rule, Rule::Unchanged);
+    }
+
+    #[test]
+    fn font_11_is_unchanged() {
+        assert_eq!(plan(300, 200, Some(11.0)).rule, Rule::Unchanged);
+    }
+
+    #[test]
+    fn font_7_5_aims_for_12() {
+        // 12 / 7.5 = 1.6 needs 2x; an 11 px target would need only 1.5x.
+        assert_eq!(plan(300, 200, Some(7.5)).factor, 2.0);
+    }
+
+    #[test]
+    fn final_font_of_exactly_11_upscales() {
+        let p = plan(300, 200, Some(5.5));
+        assert_eq!((p.rule, p.factor), (Rule::Upscale, 2.0));
+    }
+
+    #[test]
+    fn output_width_is_rounded() {
+        // 301 x 1.5 = 451.5, rounded to 452.
+        assert_eq!(plan(301, 200, Some(8.0)).output_width, 452 + 34);
+    }
+
+    #[test]
+    fn too_small_serialises_as_kebab_case() {
+        assert_eq!(serde_json::to_value(Rule::TooSmall).unwrap(), "too-small");
     }
 }

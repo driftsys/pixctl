@@ -66,3 +66,21 @@ fn parse_font_px(s: &str) -> Result<f32, String> {
         Err(format!("`{s}` must be a finite number greater than 0"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_font_px_rejects_non_positive_and_non_finite() {
+        for value in ["0", "0.0", "-0", "-3", "abc", "", "NaN", "inf", "-inf"] {
+            assert!(parse_font_px(value).is_err(), "value {value}");
+        }
+    }
+
+    #[test]
+    fn parse_font_px_accepts_positive_decimals() {
+        assert_eq!(parse_font_px("10.5"), Ok(10.5));
+        assert_eq!(parse_font_px("8"), Ok(8.0));
+    }
+}

@@ -26,6 +26,7 @@ mod tests {
     #[test]
     fn content_width_is_766() {
         assert_eq!(CONTENT_WIDTH, 766);
+        assert_eq!((PADDING, FRAME), (16, 1));
         assert_eq!(FRAME_COLOUR, [208, 215, 222]);
     }
 }

@@ -59,9 +59,13 @@ fn survives_jpeg_and_scaling() {
         (resize(&base, 1.5), 21.0),
     ] {
         let est = estimate(&img);
-        let ok = est.confidence == Confidence::Low
-            || est.px.is_some_and(|px| (px - expected).abs() <= 1.5);
-        assert!(ok, "expected {expected}: {est:?}");
+        assert_eq!(
+            est.confidence,
+            Confidence::High,
+            "expected {expected}: {est:?}"
+        );
+        let px = est.px.expect("a size is estimated");
+        assert!((px - expected).abs() <= 1.5, "expected {expected}: {est:?}");
     }
 }
 
