@@ -27,6 +27,8 @@ pub struct FontReport {
 
 #[derive(Debug, Serialize)]
 pub struct Report {
+    /// Serialised lossily, so that a non-UTF-8 path cannot stop the output.
+    #[serde(serialize_with = "lossy_path")]
     pub path: PathBuf,
     pub width: u32,
     pub height: u32,
@@ -37,7 +39,13 @@ pub struct Report {
     pub output_width: u32,
 }
 
-/// Inspects every image. Returns `0`, or `2` if any image failed to load.
+/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
+fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&path.to_string_lossy())
+}
+
+/// Inspects every image. Returns `0`, or `2` if any image failed to load or
+/// the output could not be written.
 ///
 /// Errors go to `err` with the path; the other images are still reported.
 pub fn run(
@@ -151,4 +159,66 @@ fn plain_line(r: &Report) -> String {
         r.factor,
         r.output_width
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgba, RgbaImage};
+
+    #[test]
+    fn flatten_composites_onto_white() {
+        let mut img = RgbaImage::new(3, 1);
+        img.put_pixel(0, 0, Rgba([0, 0, 0, 0]));
+        img.put_pixel(1, 0, Rgba([0, 0, 0, 255]));
+        img.put_pixel(2, 0, Rgba([0, 0, 0, 128]));
+        let gray = flatten_to_gray(&img);
+        assert_eq!(gray.get_pixel(0, 0).0[0], 255);
+        assert_eq!(gray.get_pixel(1, 0).0[0], 0);
+        assert_eq!(gray.get_pixel(2, 0).0[0], 127);
+    }
+
+    /// A writer that always fails.
+    struct Broken;
+
+    impl Write for Broken {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("broken pipe"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn output_write_failure_exits_2() {
+        let mut err = Vec::new();
+        assert_eq!(run(&[], true, None, &mut Broken, &mut err), 2);
+        assert!(String::from_utf8(err).unwrap().contains("broken pipe"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_path_serialises_lossily() {
+        use std::os::unix::ffi::OsStrExt;
+        let path = PathBuf::from(std::ffi::OsStr::from_bytes(b"bad\xff.png"));
+        let report = Report {
+            path,
+            width: 1,
+            height: 1,
+            alpha: false,
+            font: FontReport {
+                px: None,
+                confidence: Confidence::Low,
+                lines: 0,
+                glyphs: 0,
+                source: FontSource::Estimate,
+            },
+            rule: Rule::Icon,
+            factor: 1.0,
+            output_width: 1,
+        };
+        let json = serde_json::to_string(&[report]).expect("serialises");
+        assert!(json.contains("\"bad\u{FFFD}.png\""), "{json}");
+    }
 }
