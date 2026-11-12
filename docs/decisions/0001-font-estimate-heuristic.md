@@ -12,7 +12,7 @@
 ## Decision
 
 The MVP uses a heuristic with no OCR model. The estimator returns a size plus a
-confidence. `--font-px N` overrides the estimate for every input. `ocrs` stays a
+confidence. `--font-px F` overrides the estimate for every input. `ocrs` stays a
 later option behind the same `font::estimate` interface.
 
 ## Consequences

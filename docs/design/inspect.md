@@ -16,8 +16,6 @@ parses the arguments, calls `inspect`, and stubs `fit` and `check`.
 | [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                 |
 | [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                       |
 
-Later milestones add `fit.rs` (M3), `checks.rs` (M2) and the matching commands.
-
 ## Interfaces
 
 - `contract`: `COLUMN = 800`, `MIN_FONT_PX = 11`, `TARGET_FONT_PX = 12`,
@@ -63,6 +61,8 @@ is given.
   `font { px, confidence, lines, glyphs, source }`, `rule`, `factor`,
   `output_width`. `source` is `estimate` or `override`. With `--font-px`,
   confidence is `high` and `lines`/`glyphs` are `0`. Rules are kebab-case.
+  `path` is written with invalid UTF-8 replaced by U+FFFD, so one path never
+  stops the output.
 - Plain: one line per image, with the font shown as `<px>px` or `?px`.
 - Load failures go to stderr only (`pixctl: <error>`).
 
@@ -72,7 +72,7 @@ is given.
   committed in [`tests/fonts/`](../../tests/fonts/README.md) (DejaVu Sans,
   Liberation Sans, Noto Sans), so the em size is exact.
 - Load-test images are generated into a temp directory at test time instead of
-  committed binaries. M2 commits the real corpus.
+  committed binaries.
 - `tests/font_accuracy.rs` checks the ±1.5 px acceptance; `tests/inspect.rs`
   covers the command, the JSON shape, blank and transparent images, and mixed
   valid and failing inputs.

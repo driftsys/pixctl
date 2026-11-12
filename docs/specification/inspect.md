@@ -27,8 +27,8 @@ Implemented in milestone M1. Decisions:
 - Without `--json`, `inspect` prints one line per image. With `--json`, it
   prints an array with one object per image that loaded.
 - An image that fails to load is reported on stderr with its path. The other
-  images are still reported. The exit code is `2` when any image fails, and `0`
-  otherwise.
+  images are still reported. The exit code is `2` when any image fails or the
+  output cannot be written, and `0` otherwise.
 - A low confidence is not a failure: `inspect` exits `0` for it.
 
 ## Rules
@@ -50,5 +50,5 @@ Implemented in milestone M1. Decisions:
 
 ## Terminology
 
-`needs-review` is the status that the future `check` command (M2) produces for a
-`low` confidence. `inspect` reports only the confidence.
+`inspect` reports only the confidence, `high` or `low`. It produces no review
+status.

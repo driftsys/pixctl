@@ -87,7 +87,7 @@ $ pixctl inspect --json blank.png
   fitted image. `oversize` images are not scaled, so their `output_width` is
   wider than the 800 px column.
 - An image that fails to load is reported on stderr and left out of the output.
-  The exit code is `2` when any image fails.
+  The exit code is `2` when any image fails or the output cannot be written.
 
 ## License
 
