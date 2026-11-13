@@ -366,3 +366,58 @@ fn case_only_collision_exits_2() {
     // The first input keeps the output file.
     assert_eq!(image::open(out.join("A.png")).unwrap().width(), 334);
 }
+
+#[test]
+fn refuses_an_output_that_is_another_input() {
+    let dir = TempDir::new().unwrap();
+    let raw = dir.path().join("raw2");
+    std::fs::create_dir(&raw).unwrap();
+    let first = png(&raw, "a.png", 300, 200);
+    let d = dir.path().join("d");
+    std::fs::create_dir(&d).unwrap();
+    let second = png(&d, "a.png", 320, 240);
+    let before = std::fs::read(&second).unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&d)
+        .arg(&first)
+        .arg(&second)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(String::from_utf8(res.stderr)
+        .unwrap()
+        .contains("would overwrite an input"));
+    assert_eq!(std::fs::read(&second).unwrap(), before);
+}
+
+#[test]
+fn missing_input_does_not_block_other_images_in_an_existing_out_dir() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let b = png(dir.path(), "b.png", 300, 200);
+    let out = dir.path().join("out");
+    pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&a)
+        .arg(&b)
+        .assert()
+        .code(0);
+    // Second run: both outputs exist, and the first input is gone.
+    std::fs::remove_file(&a).unwrap();
+    std::fs::remove_file(out.join("b.png")).unwrap();
+    std::fs::write(out.join("b.png"), b"old").unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&a)
+        .arg(&b)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    let stderr = String::from_utf8(res.stderr).unwrap();
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    assert!(!stderr.contains("overwrite"), "{stderr}");
+    assert_eq!(image::open(out.join("b.png")).unwrap().width(), 334);
+}
