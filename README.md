@@ -239,7 +239,10 @@ $ pixctl fit --font-px 8 blank.png --out up
 FIT  [upscale] blank.png  up/blank.png (484×334)
 ```
 
-The output of an `icon`, `unchanged` or `upscale` image passes `check`:
+The output of an `icon`, `unchanged` or `upscale` image passes the `width`,
+`opaque` and `framed` checks. `min-font-size` still depends on the text in the
+image: these test images have no text, so they get `REVIEW`, which fails under
+`--strict`.
 
 ```console
 $ pixctl check fitted/blank.png fitted/dot.png fitted/clear.png
@@ -281,8 +284,8 @@ pixctl: same/blank.png: the output same/blank.png would overwrite an input
 ```
 
 The errors go to stderr, the other images are still written, and the exit code
-is `2`. The exit code is also `2` when an image cannot be loaded. It is `0`
-otherwise.
+is `2`. The exit code is also `2` when an image cannot be loaded or the output
+lines cannot be written. It is `0` otherwise.
 
 ## License
 
