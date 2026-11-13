@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
     name = "pixctl",
-    version,
+    version = concat!(env!("CARGO_PKG_VERSION"), " (display contract 1)"),
     about = "Fits raster images for Markdown docs and gates their display size"
 )]
 pub struct Cli {
@@ -25,31 +25,34 @@ pub enum Command {
         #[arg(long, value_name = "F", value_parser = parse_font_px)]
         font_px: Option<f32>,
     },
-    /// (not yet implemented) Convert, scale, flatten, pad and frame images
+    /// Convert, scale, flatten, pad and frame images
     Fit {
         #[arg(required = true)]
         images: Vec<PathBuf>,
         /// Output directory
         #[arg(long)]
         out: PathBuf,
-        /// Output format
-        #[arg(long, value_enum, default_value_t = Format::Png)]
-        format: Format,
+        /// Use this font size in pixels instead of the estimate
+        #[arg(long, value_name = "F", value_parser = parse_font_px)]
+        font_px: Option<f32>,
     },
-    /// (not yet implemented) Run the display gate on images
+    /// Run the display gate on images
     Check {
         #[arg(required = true)]
         images: Vec<PathBuf>,
         /// Display target
         #[arg(long, value_enum, default_value_t = Target::Markdown)]
         target: Target,
+        /// Treat warnings as failures
+        #[arg(long)]
+        strict: bool,
+        /// Use this font size in pixels instead of the estimate
+        #[arg(long, value_name = "F", value_parser = parse_font_px)]
+        font_px: Option<f32>,
+        /// Emit JSON
+        #[arg(long)]
+        json: bool,
     },
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-pub enum Format {
-    Png,
-    Webp,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -70,6 +73,17 @@ fn parse_font_px(s: &str) -> Result<f32, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contract::CONTRACT_VERSION;
+    use clap::CommandFactory;
+
+    #[test]
+    fn version_string_carries_contract_version() {
+        let version = Cli::command().render_version();
+        assert!(
+            version.contains(&format!("(display contract {CONTRACT_VERSION})")),
+            "{version}"
+        );
+    }
 
     #[test]
     fn parse_font_px_rejects_non_positive_and_non_finite() {
