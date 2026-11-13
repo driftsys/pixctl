@@ -2,8 +2,8 @@
 
 use crate::font::{self, Confidence};
 use crate::load;
+use crate::output::{self, lossy_path, Envelope, Failure};
 use crate::rule::{self, Rule};
-use anyhow::Result;
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -38,15 +38,53 @@ pub struct Report {
     pub output_width: u32,
 }
 
-/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
-fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&path.to_string_lossy())
+/// The totals of an `inspect` run. `images` counts the reports, not the inputs.
+#[derive(Debug, Default, Serialize)]
+struct Summary {
+    images: usize,
+    icon: usize,
+    unchanged: usize,
+    upscale: usize,
+    too_small: usize,
+    oversize: usize,
+}
+
+impl Summary {
+    fn of(reports: &[Report]) -> Self {
+        let mut s = Summary {
+            images: reports.len(),
+            ..Summary::default()
+        };
+        for r in reports {
+            match r.rule {
+                Rule::Icon => s.icon += 1,
+                Rule::Unchanged => s.unchanged += 1,
+                Rule::Upscale => s.upscale += 1,
+                Rule::TooSmall => s.too_small += 1,
+                Rule::Oversize => s.oversize += 1,
+            }
+        }
+        s
+    }
+
+    fn line(&self) -> String {
+        format!(
+            "{}: {} icon, {} unchanged, {} upscale, {} too-small, {} oversize",
+            output::count(self.images, "image"),
+            self.icon,
+            self.unchanged,
+            self.upscale,
+            self.too_small,
+            self.oversize
+        )
+    }
 }
 
 /// Inspects every image. Returns `0`, or `2` if any image failed to load or
 /// the output could not be written.
 ///
-/// Errors go to `err` with the path; the other images are still reported.
+/// Each error goes to `err` as one `pixctl: <message>` line and, with `json`,
+/// into the envelope. The other images are still reported.
 pub fn run(
     images: &[PathBuf],
     json: bool,
@@ -55,24 +93,37 @@ pub fn run(
     err: &mut impl Write,
 ) -> i32 {
     let mut reports = Vec::new();
-    let mut code = 0;
+    let mut errors = Vec::new();
     for path in images {
         match inspect(path, font_px) {
             Ok(report) => reports.push(report),
-            Err(e) => {
-                let _ = writeln!(err, "pixctl: {e:#}");
-                code = 2;
+            Err(failure) => {
+                let _ = writeln!(err, "pixctl: {failure}");
+                errors.push(failure);
             }
         }
     }
+    let mut code = if errors.is_empty() { 0 } else { 2 };
+    let summary = Summary::of(&reports);
     let written = if json {
-        serde_json::to_writer_pretty(&mut *out, &reports)
-            .map_err(anyhow::Error::from)
-            .and_then(|()| writeln!(out).map_err(anyhow::Error::from))
+        let envelope = Envelope {
+            schema: "pixctl/inspect/v1".to_string(),
+            results: reports,
+            summary,
+            errors,
+        };
+        output::write_envelope(out, &envelope)
     } else {
         reports
             .iter()
             .try_for_each(|r| writeln!(out, "{}", plain_line(r)))
+            .and_then(|()| {
+                if reports.is_empty() {
+                    Ok(())
+                } else {
+                    writeln!(out, "{}", summary.line())
+                }
+            })
             .map_err(anyhow::Error::from)
     };
     if let Err(e) = written {
@@ -82,7 +133,7 @@ pub fn run(
     code
 }
 
-fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report> {
+fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report, Failure> {
     let loaded = load::load(path)?;
     let (width, height) = loaded.rgba.dimensions();
     let font = match font_px {

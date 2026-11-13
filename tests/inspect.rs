@@ -39,11 +39,14 @@ fn blank_png(dir: &Path, name: &str, w: u32, h: u32) -> PathBuf {
     path
 }
 
+fn envelope_of(output: &[u8]) -> Value {
+    serde_json::from_slice::<Value>(output).expect("stdout is JSON")
+}
+
 fn json_of(output: &[u8]) -> Vec<Value> {
-    serde_json::from_slice::<Value>(output)
-        .expect("stdout is JSON")
+    envelope_of(output)["results"]
         .as_array()
-        .expect("JSON array")
+        .expect("results array")
         .clone()
 }
 
@@ -113,7 +116,8 @@ fn plain_output_has_one_line_per_image() {
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8(out.stdout).unwrap();
     let lines: Vec<&str> = stdout.lines().collect();
-    assert_eq!(lines.len(), 2, "{stdout}");
+    assert_eq!(lines.len(), 3, "{stdout}");
+    assert!(lines[2].starts_with("2 images: "), "{stdout}");
     assert!(lines[0].contains(&a.display().to_string()));
     assert!(lines[0].contains("300x200"));
     assert!(lines[0].contains("unchanged"));
@@ -263,4 +267,154 @@ fn needs_review_still_exits_zero() {
     let r = &json_of(&out.stdout)[0];
     assert_eq!(r["font"]["confidence"], "low");
     assert_eq!(r["rule"], "unchanged");
+}
+
+#[test]
+fn json_envelope_shape() {
+    let dir = TempDir::new().unwrap();
+    let icon = blank_png(dir.path(), "icon.png", 40, 30);
+    let plain = blank_png(dir.path(), "plain.png", 300, 200);
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .args([&icon, &plain])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let env = envelope_of(&out.stdout);
+    // `Value` sorts its keys, so the order is checked on the raw text.
+    let text = String::from_utf8(out.stdout.clone()).unwrap();
+    let at = |key: &str| text.find(&format!("\n  \"{key}\"")).expect(key);
+    assert!(at("schema") < at("results"));
+    assert!(at("results") < at("summary"));
+    assert!(at("summary") < at("errors"));
+    assert_eq!(env["schema"], "pixctl/inspect/v1");
+    assert_eq!(env["results"].as_array().unwrap().len(), 2);
+    assert_eq!(env["errors"].as_array().unwrap().len(), 0);
+    let s = &env["summary"];
+    assert_eq!(s["images"], 2);
+    assert_eq!(s["icon"], 1);
+    assert_eq!(s["unchanged"], 1);
+    for key in ["upscale", "too_small", "oversize"] {
+        assert_eq!(s[key], 0, "{key}");
+    }
+}
+
+#[test]
+fn missing_file_is_a_coded_error() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("missing.png");
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .arg(&missing)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let env = envelope_of(&out.stdout);
+    assert_eq!(env["results"].as_array().unwrap().len(), 0);
+    assert_eq!(env["summary"]["images"], 0);
+    assert_eq!(env["errors"][0]["code"], "read_failed");
+    assert_eq!(env["errors"][0]["file"], missing.to_str().unwrap());
+    assert!(env["errors"][0].get("hint").is_none());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.starts_with("pixctl: "), "{stderr}");
+    assert!(stderr.contains("missing.png"), "{stderr}");
+}
+
+#[test]
+fn mixed_run_has_results_and_errors() {
+    let dir = TempDir::new().unwrap();
+    let good = blank_png(dir.path(), "good.png", 300, 200);
+    let emf = dir.path().join("a.emf");
+    std::fs::write(&emf, b"emf").unwrap();
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .args([&good, &emf])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let env = envelope_of(&out.stdout);
+    assert_eq!(env["results"].as_array().unwrap().len(), 1);
+    assert_eq!(env["errors"][0]["code"], "unsupported_type");
+}
+
+#[test]
+fn text_mode_ends_with_a_summary_line() {
+    let dir = TempDir::new().unwrap();
+    let icon = blank_png(dir.path(), "icon.png", 40, 30);
+    let plain = blank_png(dir.path(), "plain.png", 300, 200);
+    let out = pixctl()
+        .arg("inspect")
+        .args([&icon, &plain])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().last().unwrap(),
+        "2 images: 1 icon, 1 unchanged, 0 upscale, 0 too-small, 0 oversize"
+    );
+    let out = pixctl().arg("inspect").arg(&icon).output().unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.starts_with(&icon.display().to_string()), "{stdout}");
+    assert!(stdout.lines().last().unwrap().starts_with("1 image: "));
+}
+
+#[test]
+fn text_mode_omits_the_summary_when_every_input_fails() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("missing.png");
+    let out = pixctl().arg("inspect").arg(&missing).output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+}
+
+#[test]
+fn summary_counts_upscale_too_small_and_oversize() {
+    let dir = TempDir::new().unwrap();
+    let icon = blank_png(dir.path(), "icon.png", 40, 30);
+    let plain = blank_png(dir.path(), "plain.png", 300, 200);
+    let wide = blank_png(dir.path(), "wide.png", 800, 200);
+    let summary = |font: &str| {
+        let out = pixctl()
+            .args(["inspect", "--json", "--font-px", font])
+            .args([&icon, &plain, &wide])
+            .output()
+            .unwrap();
+        envelope_of(&out.stdout)["summary"].clone()
+    };
+    // 6 px text on 300 px is doubled; the 800 px image is oversize.
+    assert_eq!(
+        summary("6"),
+        serde_json::json!({
+            "images": 3, "icon": 1, "unchanged": 0,
+            "upscale": 1, "too_small": 0, "oversize": 1
+        })
+    );
+    // 5 px text cannot reach 11 px, even doubled.
+    assert_eq!(
+        summary("5"),
+        serde_json::json!({
+            "images": 3, "icon": 1, "unchanged": 0,
+            "upscale": 0, "too_small": 1, "oversize": 1
+        })
+    );
+    let out = pixctl()
+        .args(["inspect", "--font-px", "5"])
+        .args([&icon, &plain, &wide])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().last().unwrap(),
+        "3 images: 1 icon, 0 unchanged, 0 upscale, 1 too-small, 1 oversize"
+    );
+    let out = pixctl()
+        .args(["inspect", "--font-px", "6"])
+        .args([&icon, &plain, &wide])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().last().unwrap(),
+        "3 images: 1 icon, 0 unchanged, 1 upscale, 0 too-small, 1 oversize"
+    );
 }

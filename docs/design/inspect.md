@@ -15,6 +15,7 @@ parses the arguments, calls the commands. `check` and `fit` are in
 | [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`     |
 | [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                 |
 | [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                             |
+| [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                  |
 | [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                   |
 
 ## Interfaces
@@ -22,9 +23,10 @@ parses the arguments, calls the commands. `check` and `fit` are in
 - `contract`: `CONTRACT_VERSION = 1`, `COLUMN = 800`, `MIN_FONT_PX = 11`,
   `TARGET_FONT_PX = 12`, `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`,
   `ICON_MAX = 64`, `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
-- `load::load(path) -> Result<Loaded { rgba, has_alpha }>`. Paths ending in
-  `.emf`/`.wmf` (any case) return an error that contains `unsupported`. Errors
-  carry the path.
+- `load::load(path) -> Result<Loaded { rgba, has_alpha }, Failure>`. Paths
+  ending in `.emf`/`.wmf` (any case) give `unsupported_type`; a file that cannot
+  be opened or decoded gives `read_failed`. Errors carry the path
+  ([output.md](output.md)).
 - `load::flatten_to_gray(&RgbaImage) -> GrayImage` composites onto white and
   converts to greyscale.
 - `font::estimate` returns `px: Option<f32>`, `confidence: High | Low`, and the
@@ -60,14 +62,21 @@ is given.
 
 ## Output
 
-- JSON: an array of objects with `path`, `width`, `height`, `alpha`,
-  `font { px, confidence, lines, glyphs, source }`, `rule`, `factor`,
+- JSON: the envelope in [output.md](output.md), schema `pixctl/inspect/v1`.
+  `results` is one object per image that loaded, with `path`, `width`, `height`,
+  `alpha`, `font { px, confidence, lines, glyphs, source }`, `rule`, `factor`,
   `output_width`. `source` is `estimate` or `override`. With `--font-px`,
   confidence is `high` and `lines`/`glyphs` are `0`. Rules are kebab-case.
   `path` is written with invalid UTF-8 replaced by U+FFFD, so one path never
-  stops the output.
-- Plain: one line per image, with the font shown as `<px>px` or `?px`.
-- Load failures go to stderr only (`pixctl: <error>`).
+  stops the output. `summary` is
+  `{images, icon, unchanged, upscale, too_small,
+  oversize}`, counted over the
+  results.
+- Plain: one line per image, with the font shown as `<px>px` or `?px`, then
+  `N images: a icon, b unchanged, c upscale, d too-small, e oversize` when at
+  least one image loaded.
+- Load failures are coded errors. They go to stderr as `pixctl: <message>` and,
+  with `--json`, into `errors`.
 
 ## Testing
 
@@ -77,5 +86,5 @@ is given.
 - Load-test images are generated into a temp directory at test time instead of
   committed binaries.
 - `tests/font_accuracy.rs` checks the ±1.5 px acceptance; `tests/inspect.rs`
-  covers the command, the JSON shape, blank and transparent images, and mixed
+  covers the command, the envelope, blank and transparent images, and mixed
   valid and failing inputs.

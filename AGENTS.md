@@ -21,6 +21,7 @@ with the code it returns).
   flattens an image to greyscale.
 - `font.rs` — estimates the font size from the heights of the text lines.
 - `rule.rs` — chooses the fit rule, scale factor and output width.
+- `output.rs` — the JSON envelope, the coded `Failure` error, colour and counts.
 - `inspect.rs` — the `inspect` command: builds the reports and prints them as
   plain lines or JSON.
 - `checks.rs` — the four display checks (`width`, `min-font-size`, `opaque`,

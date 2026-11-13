@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use crate::output::Failure;
 use image::{GrayImage, Luma, RgbaImage};
 
 /// A decoded image in RGBA8 form.
@@ -13,15 +13,30 @@ pub struct Loaded {
 }
 
 /// Decode the image at `path` to RGBA8.
-pub fn load(path: &Path) -> Result<Loaded> {
+///
+/// Fails with `unsupported_type` for EMF/WMF and `read_failed` when the file
+/// cannot be opened or decoded.
+pub fn load(path: &Path) -> Result<Loaded, Failure> {
     let ext = path
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
     if matches!(ext.as_deref(), Some("emf" | "wmf")) {
-        bail!("unsupported image format (EMF/WMF): {}", path.display());
+        return Err(Failure {
+            code: "unsupported_type",
+            message: format!("unsupported image format (EMF/WMF): {}", path.display()),
+            file: Some(path.to_string_lossy().into_owned()),
+            hint: None,
+            with: None,
+        });
     }
     let rgba = image::open(path)
-        .with_context(|| format!("cannot decode image {}", path.display()))?
+        .map_err(|e| Failure {
+            code: "read_failed",
+            message: format!("cannot decode image {}: {e}", path.display()),
+            file: Some(path.to_string_lossy().into_owned()),
+            hint: None,
+            with: None,
+        })?
         .to_rgba8();
     let has_alpha = rgba.pixels().any(|p| p.0[3] < 255);
     Ok(Loaded { rgba, has_alpha })
@@ -148,6 +163,19 @@ mod tests {
             let err = load(&p).err().expect("emf/wmf must fail");
             assert!(format!("{err:#}").contains("unsupported"), "{name}");
         }
+    }
+
+    #[test]
+    fn load_failures_carry_codes() {
+        let (_d, p) = tmp("a.emf");
+        std::fs::write(&p, b"").unwrap();
+        let f = load(&p).err().expect("emf must fail");
+        assert_eq!(f.code, "unsupported_type");
+        assert_eq!(f.file.as_deref(), Some(p.to_str().unwrap()));
+        let (_d, p) = tmp("nope.png");
+        let f = load(&p).err().expect("missing file must fail");
+        assert_eq!(f.code, "read_failed");
+        assert_eq!(f.file.as_deref(), Some(p.to_str().unwrap()));
     }
 
     #[test]

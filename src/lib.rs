@@ -7,4 +7,5 @@ pub mod fit_cmd;
 pub mod font;
 pub mod inspect;
 pub mod load;
+pub mod output;
 pub mod rule;
