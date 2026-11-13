@@ -110,6 +110,26 @@ mod tests {
     }
 
     #[test]
+    fn upscale_1_5x_uses_a_smoothing_filter() {
+        let mut img = white(300, 200);
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            if (x + y) % 2 == 0 {
+                *p = Rgba([0, 0, 0, 255]);
+            }
+        }
+        let out = render(&img, &plan_of(Rule::Upscale, 1.5, 484));
+        assert_eq!(out.dimensions(), (450 + 34, 300 + 34));
+        let content = |x: u32, y: u32| out.get_pixel(x + 17, y + 17).0[0];
+        let mut grey = false;
+        for y in 20..60 {
+            for x in 20..60 {
+                grey |= content(x, y) != 0 && content(x, y) != 255;
+            }
+        }
+        assert!(grey, "no intermediate value, so the filter was nearest");
+    }
+
+    #[test]
     fn icon_only_flattens() {
         let mut img = white(32, 32);
         img.put_pixel(3, 4, Rgba([0, 0, 0, 0]));

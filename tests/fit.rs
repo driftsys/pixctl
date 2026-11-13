@@ -159,3 +159,26 @@ fn fit_output_passes_check() {
         }
     }
 }
+
+#[test]
+fn case_only_collision_exits_2() {
+    let dir = TempDir::new().unwrap();
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    let a = png(&src, "A.png", 300, 200);
+    let b = src.join("a.jpg");
+    RgbImage::from_pixel(100, 100, Rgb([0, 0, 0]))
+        .save(&b)
+        .unwrap();
+    let out = dir.path().join("out");
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&a)
+        .arg(&b)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    // The first input keeps the output file.
+    assert_eq!(image::open(out.join("A.png")).unwrap().width(), 334);
+}

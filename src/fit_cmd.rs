@@ -23,6 +23,7 @@ pub fn run(
     let inputs: HashSet<PathBuf> = images
         .iter()
         .filter_map(|p| p.canonicalize().ok())
+        .map(|p| fold_case(&p))
         .collect();
     for path in images {
         match fit_one(path, out_dir, font_px, &inputs, &mut written) {
@@ -60,9 +61,15 @@ fn fit_one(
         out_dir.join(name)
     };
     // The directory exists now, so the target can be compared by real path.
-    let key = out_dir
-        .canonicalize()?
-        .join(target.file_name().unwrap_or_default());
+    // An existing output is resolved too, so a link to an input is detected.
+    let resolved = if target.exists() {
+        target.canonicalize()?
+    } else {
+        out_dir
+            .canonicalize()?
+            .join(target.file_name().unwrap_or_default())
+    };
+    let key = fold_case(&resolved);
     if inputs.contains(&key) {
         bail!("the output {} would overwrite an input", target.display());
     }
@@ -83,6 +90,13 @@ fn fit_one(
         img.width(),
         img.height()
     ))
+}
+
+/// Lowercases the file name, so that names that differ only in case compare
+/// equal. Case-insensitive file systems (macOS, Windows) map them to one file.
+fn fold_case(path: &Path) -> PathBuf {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    path.with_file_name(name.to_lowercase())
 }
 
 /// The font size that drives the rule: the override, else a high-confidence
