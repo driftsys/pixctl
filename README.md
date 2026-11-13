@@ -261,8 +261,8 @@ PASS  [framed] fitted/clear.png  frame and padding present
 ```
 
 `fit` is deterministic: the same image and the same version give the same output
-bytes on every run. The PNG encoder uses a fixed setting, writes no metadata and
-no interlacing.
+bytes on every run. The PNG encoder uses fixed settings, writes no metadata and
+no interlacing. The files are not optimised for size.
 
 Two cases are errors for the image that causes them:
 
