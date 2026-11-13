@@ -32,9 +32,10 @@ fn fit_writes_png_and_line() {
     assert_eq!(res.status.code(), Some(0));
     let target = out.join("a.png");
     assert!(target.exists());
-    let stdout = String::from_utf8(res.stdout).unwrap();
+    assert!(res.stdout.is_empty(), "stdout must stay empty in text mode");
+    let stderr = String::from_utf8(res.stderr).unwrap();
     assert_eq!(
-        stdout.trim_end(),
+        stderr.trim_end(),
         format!(
             "FIT  [unchanged] {}  {} (334×234)",
             input.display(),
@@ -138,7 +139,8 @@ fn refuses_to_overwrite_input() {
     assert_eq!(std::fs::read(&input).unwrap(), before);
 }
 
-/// Runs `fit` on one input into `dir/label`; returns the exit code and stdout.
+/// Runs `fit` on one input into `dir/label`; returns the exit code and stderr,
+/// which carries the `FIT` lines. Asserts that stdout is empty.
 fn fit_with(dir: &Path, label: &str, input: &Path, extra: &[&str]) -> (Option<i32>, String) {
     let out = dir.join(label);
     let res = pixctl()
@@ -148,7 +150,8 @@ fn fit_with(dir: &Path, label: &str, input: &Path, extra: &[&str]) -> (Option<i3
         .arg(input)
         .output()
         .unwrap();
-    (res.status.code(), String::from_utf8(res.stdout).unwrap())
+    assert!(res.stdout.is_empty(), "stdout must stay empty in text mode");
+    (res.status.code(), String::from_utf8(res.stderr).unwrap())
 }
 
 #[test]
@@ -168,15 +171,15 @@ fn fit_output_passes_check() {
         ("icon", &icon, &[][..], "icon", (32, 32)),
     ];
     for (label, input, extra, rule, size) in cases {
-        let (code, stdout) = fit_with(dir.path(), label, input, extra);
+        let (code, stderr) = fit_with(dir.path(), label, input, extra);
         assert_eq!(code, Some(0), "{label}");
         let name = input.file_name().unwrap().to_str().unwrap();
-        assert!(stdout.starts_with(&format!("FIT  [{rule}] ")), "{stdout}");
+        assert!(stderr.starts_with(&format!("FIT  [{rule}] ")), "{stderr}");
         assert!(
-            stdout
+            stderr
                 .trim_end()
                 .ends_with(&format!("({}×{})", size.0, size.1)),
-            "{stdout}"
+            "{stderr}"
         );
         let rgba = image::open(dir.path().join(label).join(name))
             .unwrap()
@@ -192,9 +195,9 @@ fn fit_output_passes_check() {
 fn oversize_and_too_small_exit_0_with_a_border() {
     let dir = TempDir::new().unwrap();
     let wide = png(dir.path(), "wide.png", 800, 100);
-    let (code, stdout) = fit_with(dir.path(), "o", &wide, &[]);
+    let (code, stderr) = fit_with(dir.path(), "o", &wide, &[]);
     assert_eq!(code, Some(0));
-    assert!(stdout.starts_with("FIT  [oversize] "), "{stdout}");
+    assert!(stderr.starts_with("FIT  [oversize] "), "{stderr}");
     let rgba = image::open(dir.path().join("o/wide.png"))
         .unwrap()
         .to_rgba8();
@@ -202,9 +205,9 @@ fn oversize_and_too_small_exit_0_with_a_border() {
     assert!(is_framed(&rgba));
 
     let small = png(dir.path(), "small.png", 300, 200);
-    let (code, stdout) = fit_with(dir.path(), "s", &small, &["--font-px", "5"]);
+    let (code, stderr) = fit_with(dir.path(), "s", &small, &["--font-px", "5"]);
     assert_eq!(code, Some(0));
-    assert!(stdout.starts_with("FIT  [too-small] "), "{stdout}");
+    assert!(stderr.starts_with("FIT  [too-small] "), "{stderr}");
     let rgba = image::open(dir.path().join("s/small.png"))
         .unwrap()
         .to_rgba8();
@@ -247,9 +250,16 @@ fn failing_image_first_does_not_stop_fit() {
         let name = bad.display().to_string();
         assert_eq!(stderr.matches(&name).count(), 1, "{stderr}");
     }
-    assert_eq!(stderr.lines().count(), 2, "{stderr}");
-    assert!(
-        stderr.lines().all(|l| l.starts_with("pixctl: ")),
+    // Two error lines and the `FIT` line of the good image.
+    assert_eq!(stderr.lines().count(), 3, "{stderr}");
+    assert_eq!(
+        stderr.lines().filter(|l| l.starts_with("pixctl: ")).count(),
+        2,
+        "{stderr}"
+    );
+    assert_eq!(
+        stderr.lines().filter(|l| l.starts_with("FIT  ")).count(),
+        1,
         "{stderr}"
     );
 }
@@ -417,7 +427,156 @@ fn missing_input_does_not_block_other_images_in_an_existing_out_dir() {
         .unwrap();
     assert_eq!(res.status.code(), Some(2));
     let stderr = String::from_utf8(res.stderr).unwrap();
-    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    let errors = stderr.lines().filter(|l| l.starts_with("pixctl: "));
+    assert_eq!(errors.count(), 1, "{stderr}");
     assert!(!stderr.contains("overwrite"), "{stderr}");
     assert_eq!(image::open(out.join("b.png")).unwrap().width(), 334);
+}
+
+/// Runs `fit --json` and parses the envelope from stdout.
+fn fit_json(args: &[&Path], out: &Path) -> (Option<i32>, serde_json::Value, String) {
+    let res = pixctl()
+        .args(["fit", "--json", "--out"])
+        .arg(out)
+        .args(args)
+        .output()
+        .unwrap();
+    let doc = serde_json::from_slice(&res.stdout).expect("stdout is one JSON document");
+    (
+        res.status.code(),
+        doc,
+        String::from_utf8(res.stderr).unwrap(),
+    )
+}
+
+#[test]
+fn json_envelope_lists_written_images() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let out = dir.path().join("out");
+    let (code, doc, stderr) = fit_json(&[&a], &out);
+    assert_eq!(code, Some(0));
+    assert_eq!(doc["schema"], "pixctl/fit/v1");
+    assert_eq!(doc["summary"]["written"], 1);
+    assert_eq!(doc["errors"].as_array().unwrap().len(), 0);
+    let r = &doc["results"][0];
+    assert_eq!(r["path"], a.to_string_lossy().as_ref());
+    assert_eq!(r["out"], out.join("a.png").to_string_lossy().as_ref());
+    assert_eq!(r["rule"], "unchanged");
+    assert_eq!(r["factor"], 1.0);
+    assert_eq!(r["width"], 334);
+    assert_eq!(r["height"], 234);
+    assert!(stderr.is_empty(), "no FIT line in JSON mode: {stderr}");
+}
+
+#[test]
+fn json_keys_are_in_envelope_order() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let res = pixctl()
+        .args(["fit", "--json", "--out"])
+        .arg(dir.path().join("out"))
+        .arg(&a)
+        .output()
+        .unwrap();
+    let text = String::from_utf8(res.stdout).unwrap();
+    let pos = |k: &str| text.find(&format!("\n  \"{k}\"")).unwrap();
+    assert!(pos("schema") < pos("results"));
+    assert!(pos("results") < pos("summary"));
+    assert!(pos("summary") < pos("errors"));
+}
+
+#[test]
+fn json_mixed_run_has_results_and_coded_errors() {
+    let dir = TempDir::new().unwrap();
+    let good = png(dir.path(), "good.png", 300, 200);
+    let corrupt = dir.path().join("corrupt.png");
+    std::fs::write(&corrupt, b"not an image").unwrap();
+    let emf = dir.path().join("x.emf");
+    std::fs::write(&emf, b"x").unwrap();
+    let out = dir.path().join("out");
+    let (code, doc, stderr) = fit_json(&[&corrupt, &emf, &good], &out);
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["results"].as_array().unwrap().len(), 1);
+    assert_eq!(doc["summary"]["written"], 1);
+    let errors = doc["errors"].as_array().unwrap();
+    assert_eq!(errors[0]["code"], "read_failed");
+    assert_eq!(errors[0]["file"], corrupt.to_string_lossy().as_ref());
+    assert_eq!(errors[1]["code"], "unsupported_type");
+    assert_eq!(stderr.lines().count(), 2, "{stderr}");
+    assert!(
+        stderr.lines().all(|l| l.starts_with("pixctl: ")),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn json_all_inputs_failing_still_prints_an_envelope() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("missing.png");
+    let (code, doc, _) = fit_json(&[&missing], &dir.path().join("out"));
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["results"].as_array().unwrap().len(), 0);
+    assert_eq!(doc["summary"]["written"], 0);
+    assert_eq!(doc["errors"][0]["code"], "read_failed");
+}
+
+#[test]
+fn json_out_dir_failed() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let blocker = dir.path().join("blocker");
+    std::fs::write(&blocker, b"x").unwrap();
+    let out = blocker.join("sub");
+    let (code, doc, stderr) = fit_json(&[&a], &out);
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["results"].as_array().unwrap().len(), 0);
+    let errors = doc["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0]["code"], "out_dir_failed");
+    assert_eq!(errors[0]["file"], out.to_string_lossy().as_ref());
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+}
+
+#[test]
+fn json_same_file() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    let (code, doc, _) = fit_json(&[&input], dir.path());
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["results"].as_array().unwrap().len(), 0);
+    assert_eq!(doc["errors"][0]["code"], "same_file");
+    assert_eq!(doc["errors"][0]["file"], input.to_string_lossy().as_ref());
+}
+
+#[test]
+fn json_name_collision_names_the_earlier_input() {
+    let dir = TempDir::new().unwrap();
+    let src = dir.path().join("src");
+    std::fs::create_dir(&src).unwrap();
+    let a = png(&src, "a.png", 300, 200);
+    let b = src.join("a.jpg");
+    RgbImage::from_pixel(100, 100, Rgb([0, 0, 0]))
+        .save(&b)
+        .unwrap();
+    let (code, doc, _) = fit_json(&[&a, &b], &dir.path().join("out"));
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["summary"]["written"], 1);
+    let e = &doc["errors"][0];
+    assert_eq!(e["code"], "name_collision");
+    assert_eq!(e["file"], b.to_string_lossy().as_ref());
+    assert_eq!(e["with"], a.to_string_lossy().as_ref());
+}
+
+#[test]
+fn json_write_failed() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    let out = dir.path().join("out");
+    // A directory at the target path makes the write fail.
+    std::fs::create_dir_all(out.join("a.png")).unwrap();
+    let (code, doc, _) = fit_json(&[&input], &out);
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["errors"][0]["code"], "write_failed");
+    assert_eq!(doc["errors"][0]["file"], input.to_string_lossy().as_ref());
 }

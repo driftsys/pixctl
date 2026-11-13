@@ -35,7 +35,8 @@ Examples:
     #[command(after_help = "\
 Examples:
   pixctl fit screenshot.png --out docs/img
-  pixctl fit raw/*.png --out docs/img --font-px 12")]
+  pixctl fit raw/*.png --out docs/img --font-px 12
+  pixctl fit screenshot.png --out docs/img --json")]
     Fit {
         #[arg(required = true)]
         images: Vec<PathBuf>,
@@ -45,6 +46,9 @@ Examples:
         /// Use this font size in pixels instead of the estimate
         #[arg(long, value_name = "F", value_parser = parse_font_px)]
         font_px: Option<f32>,
+        /// Emit JSON
+        #[arg(long)]
+        json: bool,
     },
     /// Run the display gate on images
     #[command(after_help = "\
