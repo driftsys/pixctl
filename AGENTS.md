@@ -11,6 +11,19 @@ Sibling of [`diagctl`](https://github.com/driftsys/diagctl). Scope: issue
 Rust 2021, `clap` derive. Exit contract: `0` clean · `1` ≥1 check failed · `2`
 operational error (`main.rs` maps `Err` → 2).
 
+## Modules
+
+- `cli.rs` — `clap` definitions of the commands and their arguments.
+- `contract.rs` — constants of the display contract (column, font, padding,
+  frame, icon size).
+- `load.rs` — decodes an image file to RGBA8 and detects transparent pixels.
+- `font.rs` — estimates the font size from the heights of the text lines.
+- `rule.rs` — chooses the fit rule, scale factor and output width.
+- `inspect.rs` — the `inspect` command: builds the reports and prints them as
+  plain lines or JSON.
+- `main.rs` — thin glue: parses the arguments, calls `inspect`, and stubs `fit`
+  and `check`.
+
 ## Build commands
 
 ```bash

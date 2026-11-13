@@ -8,14 +8,35 @@ repository = "https://github.com/driftsys/pixctl"
 readme = "README.md"
 keywords = ["cli", "image", "png", "markdown", "documentation"]
 categories = ["command-line-utilities"]
+# The tests that render text need the fonts, which are not published.
+exclude = [
+  "tests/fonts",
+  "tests/support",
+  "tests/font_accuracy.rs",
+  "tests/inspect.rs",
+  "tests/support_selftest.rs",
+]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+  "bmp",
+  "gif",
+  "tiff",
+  "webp",
+] }
+imageproc = { version = "0.27", default-features = false }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
+ab_glyph = "0.2"
 assert_cmd = "2"
 predicates = "3"
+tempfile = "3"
 
 # The profile that 'dist' will build with
 [profile.dist]
