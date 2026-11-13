@@ -25,7 +25,7 @@ pub enum Command {
         #[arg(long, value_name = "F", value_parser = parse_font_px)]
         font_px: Option<f32>,
     },
-    /// Convert, scale, flatten, pad and frame images
+    /// Scale, flatten, pad and frame images as PNG
     Fit {
         #[arg(required = true)]
         images: Vec<PathBuf>,

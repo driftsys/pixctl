@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 /// Fits every image into `out_dir`. Returns `0`, or `2` if any image failed.
 ///
-/// Errors go to `err` as `pixctl: <path>: <reason>`; the other images are
-/// still processed. If the output directory cannot be created, the error is
+/// Errors go to `err` as `pixctl: <reason>`, and the reason names the path.
+/// The other images are still processed. If the output directory cannot be created, the error is
 /// reported once and no image is processed.
 pub fn run(
     images: &[PathBuf],
@@ -43,7 +43,7 @@ pub fn run(
 }
 
 /// Loads one image and writes its fitted PNG. A load error already names the
-/// path; every other error is prefixed with it.
+/// path; every other error, including a missing file stem, is prefixed with it.
 fn fit_one(
     path: &Path,
     inputs: &[PathBuf],
@@ -54,7 +54,9 @@ fn fit_one(
     let loaded = load::load(path)?;
     let (w, h) = loaded.rgba.dimensions();
     let plan = rule::plan(w, h, chosen_font(&loaded.rgba, font_px));
-    let stem = path.file_stem().context("the file name has no stem")?;
+    let stem = path
+        .file_stem()
+        .with_context(|| format!("{}: the file name has no stem", path.display()))?;
     let target = {
         let mut name = stem.to_os_string();
         name.push(".png");
