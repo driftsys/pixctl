@@ -21,8 +21,9 @@ operational error (`main.rs` maps `Err` → 2).
 - `rule.rs` — chooses the fit rule, scale factor and output width.
 - `inspect.rs` — the `inspect` command: builds the reports and prints them as
   plain lines or JSON.
-- `main.rs` — thin glue: parses the arguments, calls `inspect`, and stubs `fit`
-  and `check`.
+- `fit.rs` — renders an image to the display contract and encodes the PNG.
+- `fit_cmd.rs` — the `fit` command: writes one fitted PNG per input.
+- `main.rs` — thin glue: parses the arguments and calls the commands.
 
 ## Build commands
 

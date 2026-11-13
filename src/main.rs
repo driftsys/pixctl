@@ -1,17 +1,10 @@
 use clap::Parser;
 use pixctl::cli::{Cli, Command};
-use pixctl::{check, inspect};
-
-const TRACKING: &str = "https://github.com/driftsys/pixctl/issues/1";
-
-fn not_yet_implemented(name: &str) -> anyhow::Result<i32> {
-    eprintln!("{name}: not yet implemented (tracking: {TRACKING})");
-    Ok(2)
-}
+use pixctl::{check, fit_cmd, inspect};
 
 fn main() {
     let cli = Cli::parse();
-    let result = match cli.command {
+    let result: anyhow::Result<i32> = match cli.command {
         Command::Inspect {
             images,
             json,
@@ -23,7 +16,17 @@ fn main() {
             &mut std::io::stdout().lock(),
             &mut std::io::stderr().lock(),
         )),
-        Command::Fit { .. } => not_yet_implemented("fit"),
+        Command::Fit {
+            images,
+            out,
+            font_px,
+        } => Ok(fit_cmd::run(
+            &images,
+            &out,
+            font_px,
+            &mut std::io::stdout().lock(),
+            &mut std::io::stderr().lock(),
+        )),
         Command::Check {
             images,
             strict,

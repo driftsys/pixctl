@@ -27,15 +27,6 @@ fn help_lists_all_subcommands() {
 }
 
 #[test]
-fn stubs_exit_2_with_tracking_link() {
-    pixctl()
-        .args(["fit", "a.png", "--out", "out"])
-        .assert()
-        .code(2)
-        .stderr(contains("not yet implemented"));
-}
-
-#[test]
 fn version_reports_contract() {
     pixctl()
         .arg("--version")
