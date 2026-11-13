@@ -1,7 +1,7 @@
 //! The display checks that `check` runs on one decoded image.
 
 use crate::contract::{COLUMN, FRAME, FRAME_COLOUR, ICON_MAX, MIN_FONT_PX, PADDING};
-use crate::font::{self, Confidence};
+use crate::font;
 use crate::load::flatten_to_gray;
 use image::{imageops, RgbaImage};
 use serde::Serialize;
@@ -113,10 +113,7 @@ fn min_font_size(rgba: &RgbaImage, font_px: Option<f32>, framed: bool) -> Outcom
             } else {
                 font::estimate(&flatten_to_gray(rgba))
             };
-            match est.confidence {
-                Confidence::High => est.px,
-                Confidence::Low => None,
-            }
+            font::usable_px(est.px, est.confidence)
         }
     };
     let Some(px) = px else {
@@ -164,6 +161,7 @@ pub fn is_framed(rgba: &RgbaImage) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::font::Confidence;
     use image::Rgba;
 
     fn white(w: u32, h: u32) -> RgbaImage {

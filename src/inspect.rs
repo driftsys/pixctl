@@ -105,10 +105,7 @@ fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report> {
         }
     };
     // A low-confidence estimate never drives the rule.
-    let usable = match font.confidence {
-        Confidence::High => font.px,
-        Confidence::Low => None,
-    };
+    let usable = font::usable_px(font.px, font.confidence);
     let plan = rule::plan(width, height, usable);
     Ok(Report {
         path: path.to_path_buf(),

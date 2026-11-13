@@ -44,6 +44,15 @@ pub enum Confidence {
     Low,
 }
 
+/// The font size that may drive a decision: the estimate when its confidence
+/// is high, else `None`. A low-confidence estimate is never used.
+pub fn usable_px(px: Option<f32>, confidence: Confidence) -> Option<f32> {
+    match confidence {
+        Confidence::High => px,
+        Confidence::Low => None,
+    }
+}
+
 /// Result of [`estimate`].
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct FontEstimate {
@@ -221,6 +230,13 @@ fn coefficient_of_variation(values: &[f32]) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn usable_px_drops_a_low_confidence_estimate() {
+        assert_eq!(usable_px(Some(9.0), Confidence::High), Some(9.0));
+        assert_eq!(usable_px(Some(9.0), Confidence::Low), None);
+        assert_eq!(usable_px(None, Confidence::High), None);
+    }
+
     use super::*;
 
     #[test]
