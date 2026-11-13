@@ -346,3 +346,36 @@ fn exit_2_wins_over_exit_1() {
     assert!(String::from_utf8(out.stdout).unwrap().contains("FAIL"));
     assert_eq!(out.status.code(), Some(2));
 }
+
+#[test]
+fn a_failed_check_that_is_not_last_fails_the_image() {
+    let dir = TempDir::new().unwrap();
+    // Framed, with a font size that passes, so only `width` fails; `framed`
+    // comes after it.
+    let path = png(dir.path(), "wide.png", 1000, 200, true);
+    let out = pixctl()
+        .args(["check", "--json", "--font-px", "20"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let r = &v["results"][0];
+    assert_eq!(r["status"], "fail");
+    let statuses: Vec<_> = r["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c["check"].as_str().unwrap(), c["status"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        statuses,
+        [
+            ("width", "fail"),
+            ("min-font-size", "pass"),
+            ("opaque", "pass"),
+            ("framed", "pass")
+        ]
+    );
+    assert_eq!(v["summary"]["fail"], 1);
+}

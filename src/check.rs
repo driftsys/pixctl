@@ -2,7 +2,7 @@
 
 use crate::checks::{self, Outcome, Status};
 use crate::load;
-use crate::output::{self, Envelope, Failure};
+use crate::output::{self, lossy_path, Envelope, Failure};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,28 +17,24 @@ struct ImageResult {
     checks: Vec<Outcome>,
 }
 
+/// The worst of the statuses: fail > review > pass. Pass when there is none.
+fn worst(statuses: impl Iterator<Item = Status>) -> Status {
+    statuses.fold(Status::Pass, |worst, s| match (worst, s) {
+        (Status::Fail, _) | (_, Status::Fail) => Status::Fail,
+        (Status::Review, _) | (_, Status::Review) => Status::Review,
+        _ => Status::Pass,
+    })
+}
+
 impl ImageResult {
     fn new(path: &Path, checks: Vec<Outcome>) -> Self {
-        // fail > review > pass
-        let status = checks
-            .iter()
-            .map(|c| c.status)
-            .fold(Status::Pass, |worst, s| match (worst, s) {
-                (Status::Fail, _) | (_, Status::Fail) => Status::Fail,
-                (Status::Review, _) | (_, Status::Review) => Status::Review,
-                _ => Status::Pass,
-            });
+        let status = worst(checks.iter().map(|c| c.status));
         ImageResult {
             path: path.to_path_buf(),
             status,
             checks,
         }
     }
-}
-
-/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
-fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&path.to_string_lossy())
 }
 
 /// The totals of a `check` run. `images` counts the results, not the inputs.
@@ -121,9 +117,7 @@ pub fn run(
             summary,
             errors,
         };
-        serde_json::to_writer_pretty(&mut *out, &envelope)
-            .map_err(anyhow::Error::from)
-            .and_then(|()| writeln!(out).map_err(anyhow::Error::from))
+        output::write_envelope(out, &envelope)
     } else {
         results
             .iter()
@@ -177,6 +171,22 @@ mod tests {
         }
         fn flush(&mut self) -> std::io::Result<()> {
             Ok(())
+        }
+    }
+
+    #[test]
+    fn worst_status_is_fail_over_review_over_pass() {
+        use Status::{Fail, Pass, Review};
+        let cases: [(&[Status], Status); 6] = [
+            (&[Fail, Pass], Fail),
+            (&[Pass, Fail], Fail),
+            (&[Review, Fail], Fail),
+            (&[Fail, Review], Fail),
+            (&[Review, Pass], Review),
+            (&[Pass, Pass], Pass),
+        ];
+        for (statuses, expected) in cases {
+            assert_eq!(worst(statuses.iter().copied()), expected, "{statuses:?}");
         }
     }
 

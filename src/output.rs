@@ -2,6 +2,8 @@
 
 use serde::Serialize;
 use std::fmt;
+use std::io::Write;
+use std::path::Path;
 
 /// A coded error, reported in the JSON envelope and as one stderr line.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -34,6 +36,21 @@ pub struct Envelope<R, S> {
     pub errors: Vec<Failure>,
 }
 
+/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
+pub fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&path.to_string_lossy())
+}
+
+/// Writes the envelope as pretty JSON followed by a newline.
+pub fn write_envelope<R: Serialize, S: Serialize>(
+    out: &mut impl Write,
+    envelope: &Envelope<R, S>,
+) -> anyhow::Result<()> {
+    serde_json::to_writer_pretty(&mut *out, envelope)?;
+    writeln!(out)?;
+    Ok(())
+}
+
 /// Decides whether to colour the output.
 ///
 /// A non-empty `NO_COLOR` turns colour off and wins over everything else. A
@@ -48,10 +65,10 @@ pub fn color_enabled(is_tty: bool, no_color: Option<&str>, clicolor_force: Optio
     is_tty
 }
 
-/// Wraps a status tag in an ANSI colour when `enabled`. The visible text, and
-/// so the padding width, is the same either way.
+/// Wraps a status tag in an ANSI colour when `enabled`. The visible text is the
+/// same either way.
 pub fn paint(tag: &str, enabled: bool) -> String {
-    let code = match tag.trim_end() {
+    let code = match tag {
         "PASS" => "32",
         "FAIL" => "31",
         "REVIEW" => "33",
@@ -116,12 +133,6 @@ mod tests {
         for tag in ["PASS", "FAIL", "REVIEW"] {
             assert_eq!(paint(tag, false), tag);
         }
-    }
-
-    #[test]
-    fn paint_keeps_the_padding_width() {
-        assert_eq!(paint("PASS  ", false), "PASS  ");
-        assert_eq!(paint("PASS  ", true), "\x1b[32mPASS  \x1b[0m");
     }
 
     #[test]
