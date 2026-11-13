@@ -9,7 +9,8 @@ Sibling of [`diagctl`](https://github.com/driftsys/diagctl). Scope: issue
 [#1](https://github.com/driftsys/pixctl/issues/1).
 
 Rust 2021, `clap` derive. Exit contract: `0` clean · `1` ≥1 check failed · `2`
-operational error (`main.rs` maps `Err` → 2).
+operational error (each command maps its own errors to 2 and `main.rs` exits
+with the code it returns).
 
 ## Modules
 
@@ -21,6 +22,10 @@ operational error (`main.rs` maps `Err` → 2).
 - `rule.rs` — chooses the fit rule, scale factor and output width.
 - `inspect.rs` — the `inspect` command: builds the reports and prints them as
   plain lines or JSON.
+- `checks.rs` — the four display checks (`width`, `min-font-size`, `opaque`,
+  `framed`) on one decoded image.
+- `check.rs` — the `check` command: runs the checks and prints PASS, FAIL and
+  REVIEW lines or JSON.
 - `fit.rs` — renders an image to the display contract and encodes the PNG.
 - `fit_cmd.rs` — the `fit` command: writes one fitted PNG per input.
 - `main.rs` — thin glue: parses the arguments and calls the commands.

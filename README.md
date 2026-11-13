@@ -5,14 +5,23 @@ Markdown docs (GitLab, GitHub, mdbook): it inspects images, fits them to a fixed
 display contract (800 px column, 11 px minimum displayed font, opaque white
 background with padding and frame) and gates them in CI.
 
-> **Status: early development.** `inspect` is implemented. `fit` and `check` are
-> stubbed and exit `2` with "not yet implemented". Scope and rules are tracked
-> in **[#1](https://github.com/driftsys/pixctl/issues/1)**.
+> **Status: early development.** `inspect`, `check` and `fit` are implemented.
+> Scope and rules are tracked in
+> **[#1](https://github.com/driftsys/pixctl/issues/1)**.
 
 Siblings: [`diagctl`](https://github.com/driftsys/diagctl) (SVG diagrams) and
 [`tblctl`](https://github.com/driftsys/tblctl) (tables).
 
 Exit codes: `0` clean · `1` ≥1 check failed · `2` operational error.
+
+`pixctl --version` reports the display contract version next to the program
+version. The contract version changes whenever a constant of the display
+contract changes:
+
+```console
+$ pixctl --version
+pixctl 0.0.1 (display contract 1)
+```
 
 ## Install
 
@@ -88,6 +97,192 @@ $ pixctl inspect --json blank.png
   wider than the 800 px column.
 - An image that fails to load is reported on stderr and left out of the output.
   The exit code is `2` when any image fails or the output cannot be written.
+
+### check
+
+```sh
+pixctl check <image>... [--target markdown] [--strict] [--font-px F] [--json]
+```
+
+`check` gates images as they are committed, so it expects fitted images: the
+padding and the frame must already be present. It runs four checks on each
+image, in this order:
+
+- `width`: passes when the image is at most 800 px wide.
+- `min-font-size`: the displayed font size is the estimated font size times
+  `min(1, 800 / width)`. It passes when the result is at least 11 px. When the
+  image is framed, the estimate uses the content inside the frame.
+- `opaque`: fails when any pixel has an alpha value below 255.
+- `framed`: passes when the outer 1 px ring is exactly `#d0d7de` and the 16 px
+  band inside it is exactly white. An image smaller than 35 by 35 px is never
+  framed.
+
+An icon is an image whose larger side is at most 64 px. It passes
+`min-font-size` and `framed` with the detail `icon`.
+
+`--target` selects the display target. `markdown` is the only target and the
+default. `--font-px F` replaces the font estimate with a given font size in
+pixels; F is a positive number and may be a decimal.
+
+Without `--json`, `check` prints one line per check and image, in the form
+`TAG  [check] path  detail`:
+
+```console
+$ pixctl check blank.png wide.png clear.png dot.png
+PASS  [width] blank.png  300 px <= 800 px
+REVIEW  [min-font-size] blank.png  font size estimate has low confidence
+PASS  [opaque] blank.png  no transparent pixel
+FAIL  [framed] blank.png  frame or padding missing
+FAIL  [width] wide.png  1200 px > 800 px
+REVIEW  [min-font-size] wide.png  font size estimate has low confidence
+PASS  [opaque] wide.png  no transparent pixel
+FAIL  [framed] wide.png  frame or padding missing
+PASS  [width] clear.png  300 px <= 800 px
+REVIEW  [min-font-size] clear.png  font size estimate has low confidence
+FAIL  [opaque] clear.png  60000 transparent pixels
+FAIL  [framed] clear.png  frame or padding missing
+PASS  [width] dot.png  32 px <= 800 px
+PASS  [min-font-size] dot.png  icon
+PASS  [opaque] dot.png  no transparent pixel
+PASS  [framed] dot.png  icon
+```
+
+The tag is one of:
+
+- `PASS`: the image meets the check.
+- `FAIL`: the image does not meet the check.
+- `REVIEW`: the check cannot decide, because the font estimate has low
+  confidence and `--font-px` is not given. A person has to look at the image.
+
+`REVIEW` does not fail the run, unless `--strict` is given. With `--strict`,
+every `REVIEW` counts as a failure and the exit code is `1`.
+
+With `--json`, `check` prints a pretty-printed array with one object per check
+and image. `status` is `pass`, `fail` or `review`:
+
+```console
+$ pixctl check --json clear.png
+[
+  {
+    "path": "clear.png",
+    "check": "width",
+    "status": "pass",
+    "detail": "300 px <= 800 px"
+  },
+  {
+    "path": "clear.png",
+    "check": "min-font-size",
+    "status": "review",
+    "detail": "font size estimate has low confidence"
+  },
+  {
+    "path": "clear.png",
+    "check": "opaque",
+    "status": "fail",
+    "detail": "60000 transparent pixels"
+  },
+  {
+    "path": "clear.png",
+    "check": "framed",
+    "status": "fail",
+    "detail": "frame or padding missing"
+  }
+]
+```
+
+The exit code is `0` when no check failed, `1` when at least one check failed
+(or needs review under `--strict`), and `2` when an image cannot be loaded or
+the output cannot be written. An image that fails to load is reported on stderr
+and the other images are still checked:
+
+```console
+$ pixctl check missing.png
+pixctl: cannot decode image missing.png: No such file or directory (os error 2)
+```
+
+### fit
+
+```sh
+pixctl fit <image>... --out <dir> [--font-px F]
+```
+
+`fit` writes one PNG per input image to the `--out` directory. The output is
+named `<file stem>.png`. `fit` creates the directory when it is missing. For
+each image, it:
+
+1. flattens transparent pixels onto white;
+2. scales the image by the factor of the fit rule: `upscale` multiplies the size
+   by 2 (nearest neighbour) or by 1.5 (Lanczos3), and every other rule keeps the
+   size;
+3. adds 16 px of white padding and a 1 px `#d0d7de` frame, except for `icon`
+   images, which stay unframed.
+
+The rule is the one that `inspect` reports. `--font-px F` replaces the font
+estimate, as in `inspect`. `oversize` and `too-small` images are written at
+their own scale, so `check` still reports them. Use `check` to gate them.
+
+`fit` prints one line per image, in the form `FIT  [rule] path  output (W×H)`:
+
+```console
+$ pixctl fit blank.png wide.png clear.png dot.png --out fitted
+FIT  [unchanged] blank.png  fitted/blank.png (334×234)
+FIT  [oversize] wide.png  fitted/wide.png (1234×434)
+FIT  [unchanged] clear.png  fitted/clear.png (334×234)
+FIT  [icon] dot.png  fitted/dot.png (32×32)
+```
+
+A font size below 11 px selects `upscale`, when the scaled image still fits in
+the column:
+
+```console
+$ pixctl fit --font-px 8 blank.png --out up
+FIT  [upscale] blank.png  up/blank.png (484×334)
+```
+
+The output of an `icon`, `unchanged` or `upscale` image passes `check`:
+
+```console
+$ pixctl check fitted/blank.png fitted/dot.png fitted/clear.png
+PASS  [width] fitted/blank.png  334 px <= 800 px
+REVIEW  [min-font-size] fitted/blank.png  font size estimate has low confidence
+PASS  [opaque] fitted/blank.png  no transparent pixel
+PASS  [framed] fitted/blank.png  frame and padding present
+PASS  [width] fitted/dot.png  32 px <= 800 px
+PASS  [min-font-size] fitted/dot.png  icon
+PASS  [opaque] fitted/dot.png  no transparent pixel
+PASS  [framed] fitted/dot.png  icon
+PASS  [width] fitted/clear.png  334 px <= 800 px
+REVIEW  [min-font-size] fitted/clear.png  font size estimate has low confidence
+PASS  [opaque] fitted/clear.png  no transparent pixel
+PASS  [framed] fitted/clear.png  frame and padding present
+```
+
+`fit` is deterministic: the same image and the same version give the same output
+bytes on every run. The PNG encoder uses a fixed setting, writes no metadata and
+no interlacing.
+
+Two cases are errors for the image that causes them:
+
+- Two inputs that map to the same output name. Names that differ only in case,
+  such as `blank.png` and `BLANK.PNG`, count as the same name, because macOS and
+  Windows file systems store them as one file.
+- An output that would overwrite an input, including an input that is reached
+  through a link.
+
+```console
+$ pixctl fit blank.png BLANK.PNG --out o2
+FIT  [unchanged] blank.png  o2/blank.png (334×234)
+pixctl: BLANK.PNG: the output o2/BLANK.png was already written for another input
+```
+
+```console
+$ pixctl fit same/blank.png --out same
+pixctl: same/blank.png: the output same/blank.png would overwrite an input
+```
+
+The errors go to stderr, the other images are still written, and the exit code
+is `2`. The exit code is also `2` when an image cannot be loaded. It is `0`
+otherwise.
 
 ## License
 
