@@ -77,9 +77,9 @@ pub fn run(
             match fit_one(path, images, out_dir, font_px, &mut written) {
                 Ok(result) => {
                     if !json {
-                        if let Err(e) = writeln!(err, "{}", result.line()) {
+                        if let Err(failure) = write_status_line(err, &result, path) {
                             // `err` is broken, so this line cannot be told.
-                            errors.push(io_failure(path, &e));
+                            errors.push(failure);
                         }
                     }
                     results.push(result);
@@ -107,6 +107,11 @@ pub fn run(
         }
     }
     code
+}
+
+/// Writes the `FIT` line of `result`; a write error is a `write_failed`.
+fn write_status_line(err: &mut impl Write, result: &FitResult, path: &Path) -> Result<(), Failure> {
+    writeln!(err, "{}", result.line()).map_err(|e| io_failure(path, &e))
 }
 
 /// A failure to write a status line.
@@ -311,7 +316,7 @@ mod tests {
         let (dir, input) = one_input();
         let mut out = Vec::new();
         let code = run(
-            &[input],
+            std::slice::from_ref(&input),
             &dir.path().join("out"),
             None,
             false,
@@ -320,6 +325,77 @@ mod tests {
         );
         assert_eq!(code, 2);
         assert!(out.is_empty());
+        // The failure itself cannot be reported on the broken stderr, so the
+        // code is checked on the value that `run` records.
+        let result = FitResult {
+            path: input.clone(),
+            out: dir.path().join("out").join("a.png"),
+            rule: Rule::Unchanged,
+            factor: 1.0,
+            width: 1,
+            height: 1,
+        };
+        let failure = write_status_line(&mut Broken, &result, &input).unwrap_err();
+        assert_eq!(failure.code, "write_failed");
+    }
+
+    /// A writer that appends to a buffer shared with its clones.
+    #[derive(Clone, Default)]
+    struct Shared(std::rc::Rc<std::cell::RefCell<Vec<u8>>>);
+
+    impl Write for Shared {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.borrow_mut().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn errors_are_printed_when_they_happen() {
+        let (dir, good) = one_input();
+        let missing = dir.path().join("missing.png");
+        let shared = Shared::default();
+        let code = run(
+            &[missing, good],
+            &dir.path().join("out"),
+            None,
+            false,
+            &mut shared.clone(),
+            &mut shared.clone(),
+        );
+        assert_eq!(code, 2);
+        let text = String::from_utf8(shared.0.borrow().clone()).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "{text}");
+        assert!(lines[0].starts_with("pixctl: "), "{text}");
+        assert!(lines[1].starts_with("FIT  "), "{text}");
+    }
+
+    #[test]
+    fn a_name_stays_claimed_when_its_write_fails() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut inputs = Vec::new();
+        for sub in ["one", "two"] {
+            let d = dir.path().join(sub);
+            std::fs::create_dir(&d).unwrap();
+            let p = d.join("a.png");
+            RgbaImage::from_pixel(100, 100, Rgba([255, 255, 255, 255]))
+                .save(&p)
+                .unwrap();
+            inputs.push(p);
+        }
+        let out_dir = dir.path().join("out");
+        // A directory at the target makes the first write fail.
+        std::fs::create_dir_all(out_dir.join("a.png")).unwrap();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run(&inputs, &out_dir, None, true, &mut out, &mut err);
+        assert_eq!(code, 2);
+        let doc: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(doc["errors"][0]["code"], "write_failed");
+        assert_eq!(doc["errors"][1]["code"], "name_collision");
     }
 
     #[test]
@@ -355,10 +431,9 @@ mod tests {
         );
         let clash = failure("name_collision", Path::new("a.png"), "r".into(), None);
         assert_eq!(clash.hint.as_deref(), Some("rename one of the inputs"));
-        assert_eq!(
-            failure("write_failed", Path::new("a"), "r".into(), None).hint,
-            None
-        );
+        for code in ["read_failed", "write_failed", "out_dir_failed"] {
+            assert_eq!(failure(code, Path::new("a"), "r".into(), None).hint, None);
+        }
     }
 
     #[test]
