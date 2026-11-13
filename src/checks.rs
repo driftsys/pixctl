@@ -305,6 +305,46 @@ mod tests {
     }
 
     #[test]
+    fn low_confidence_with_a_size_is_review() {
+        // Two lines of 6 x 5 px blocks: the estimate is about 5 px, which
+        // would fail the check, but two lines give only low confidence.
+        let mut img = white(128, 68);
+        for row in 0..2 {
+            for col in 0..12 {
+                for y in 0..5 {
+                    for x in 0..6 {
+                        img.put_pixel(4 + col * 10 + x, 4 + row * 30 + y, Rgba([0, 0, 0, 255]));
+                    }
+                }
+            }
+        }
+        let est = font::estimate(&flatten_to_gray(&img));
+        assert!(est.px.is_some(), "{est:?}");
+        assert_eq!(est.confidence, Confidence::Low);
+        let o = find(&run_all(&img, None), "min-font-size");
+        assert_eq!(o.status, Status::Review);
+    }
+
+    #[test]
+    fn framed_needs_35_px_on_both_sides() {
+        assert!(is_framed(&ring(35, 100)));
+        assert!(is_framed(&ring(100, 35)));
+        assert!(!is_framed(&ring(34, 100)));
+        assert!(!is_framed(&ring(100, 34)));
+    }
+
+    #[test]
+    fn padding_band_is_16_px_wide() {
+        // The pixel at distance 16 from the edge is padding; 17 is content.
+        let mut img = ring(100, 60);
+        img.put_pixel(16, 30, Rgba([0, 0, 0, 255]));
+        assert!(!is_framed(&img));
+        let mut img = ring(100, 60);
+        img.put_pixel(17, 30, Rgba([0, 0, 0, 255]));
+        assert!(is_framed(&img));
+    }
+
+    #[test]
     fn status_serialises_lowercase() {
         assert_eq!(
             serde_json::to_string(&Status::Review).unwrap(),
