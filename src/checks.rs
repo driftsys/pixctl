@@ -208,7 +208,8 @@ mod tests {
     #[test]
     fn framed_rejects_wrong_ring_colour() {
         let mut img = ring(100, 60);
-        img.put_pixel(50, 0, Rgba([0xd0, 0xd7, 0xdf, 255]));
+        let [r, g, b] = FRAME_COLOUR;
+        img.put_pixel(50, 0, Rgba([r, g, b.wrapping_add(1), 255]));
         assert!(!is_framed(&img));
     }
 
@@ -232,6 +233,53 @@ mod tests {
             let o = find(&outcomes, name);
             assert_eq!((o.status, o.detail.as_str()), (Status::Pass, "icon"));
         }
+    }
+
+    #[test]
+    fn icon_boundary_is_64_on_the_larger_side() {
+        let icon = |w, h| find(&run_all(&white(w, h), None), "framed").detail == "icon";
+        assert!(icon(64, 64));
+        assert!(!icon(64, 65));
+        assert!(!icon(65, 10));
+    }
+
+    #[test]
+    fn framed_estimate_uses_the_inner_crop() {
+        // White blocks on a black inner area: 3 lines of 7 glyphs, each
+        // 6 x 11 px, so the estimate is 11 * K = 11.5 px.
+        let (iw, ih) = (78, 68);
+        let mut img = white(iw + 2 * BAND, ih + 2 * BAND);
+        for y in 0..ih {
+            for x in 0..iw {
+                img.put_pixel(BAND + x, BAND + y, Rgba([0, 0, 0, 255]));
+            }
+        }
+        for row in 0..3 {
+            for col in 0..7 {
+                for y in 0..11 {
+                    for x in 0..6 {
+                        let (px, py) = (BAND + 4 + col * 10 + x, BAND + 4 + row * 20 + y);
+                        img.put_pixel(px, py, Rgba([255, 255, 255, 255]));
+                    }
+                }
+            }
+        }
+        let [r, g, b] = FRAME_COLOUR;
+        let (w, h) = img.dimensions();
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            if x == 0 || y == 0 || x == w - 1 || y == h - 1 {
+                *p = Rgba([r, g, b, 255]);
+            }
+        }
+        assert!(is_framed(&img));
+        // On the whole image the padding hides the lines: low confidence.
+        let whole = font::estimate(&flatten_to_gray(&img));
+        assert_eq!(whole.confidence, Confidence::Low);
+        let o = find(&run_all(&img, None), "min-font-size");
+        assert_eq!(
+            (o.status, o.detail.as_str()),
+            (Status::Pass, "11.5 px >= 11 px")
+        );
     }
 
     #[test]
