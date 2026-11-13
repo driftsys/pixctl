@@ -5,7 +5,8 @@ use std::path::PathBuf;
 #[command(
     name = "pixctl",
     version = concat!(env!("CARGO_PKG_VERSION"), " (display contract 1)"),
-    about = "Fits raster images for Markdown docs and gates their display size"
+    about = "Fits raster images for Markdown docs and gates their display size",
+    after_help = "Documentation: https://github.com/driftsys/pixctl#readme"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -15,6 +16,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     /// Report size, alpha, estimated font size and rule
+    #[command(after_help = "\
+Examples:
+  pixctl inspect docs/img/diagram.png
+  pixctl inspect docs/img/*.png --json
+  pixctl inspect screenshot.png --font-px 12")]
     Inspect {
         #[arg(required = true)]
         images: Vec<PathBuf>,
@@ -26,6 +32,10 @@ pub enum Command {
         font_px: Option<f32>,
     },
     /// Scale, flatten, pad and frame images as PNG
+    #[command(after_help = "\
+Examples:
+  pixctl fit screenshot.png --out docs/img
+  pixctl fit raw/*.png --out docs/img --font-px 12")]
     Fit {
         #[arg(required = true)]
         images: Vec<PathBuf>,
@@ -37,6 +47,11 @@ pub enum Command {
         font_px: Option<f32>,
     },
     /// Run the display gate on images
+    #[command(after_help = "\
+Examples:
+  pixctl check docs/img/*.png
+  pixctl check docs/img/*.png --strict
+  pixctl check docs/img/diagram.png --json")]
     Check {
         #[arg(required = true)]
         images: Vec<PathBuf>,
