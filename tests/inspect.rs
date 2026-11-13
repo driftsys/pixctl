@@ -398,6 +398,16 @@ fn summary_counts_upscale_too_small_and_oversize() {
         })
     );
     let out = pixctl()
+        .args(["inspect", "--font-px", "5"])
+        .args([&icon, &plain, &wide])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().last().unwrap(),
+        "3 images: 1 icon, 0 unchanged, 0 upscale, 1 too-small, 1 oversize"
+    );
+    let out = pixctl()
         .args(["inspect", "--font-px", "6"])
         .args([&icon, &plain, &wide])
         .output()

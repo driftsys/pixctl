@@ -185,6 +185,20 @@ mod tests {
     }
 
     #[test]
+    fn write_envelope_ends_with_a_newline() {
+        let e = Envelope::<u8, u8> {
+            schema: "pixctl/x/v1".into(),
+            results: vec![],
+            summary: 0,
+            errors: vec![],
+        };
+        let mut out = Vec::new();
+        write_envelope(&mut out, &e).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.ends_with("}\n"), "{text:?}");
+    }
+
+    #[test]
     fn envelope_key_order() {
         let e = Envelope::<u8, u8> {
             schema: "pixctl/x/v1".into(),
