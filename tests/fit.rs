@@ -341,7 +341,7 @@ fn refuses_a_dangling_symlink_at_the_target() {
     let missing = dir.path().join("elsewhere.png");
     std::os::unix::fs::symlink(&missing, out.join("a.png")).unwrap();
     let res = pixctl()
-        .args(["fit", "--out"])
+        .args(["fit", "--json", "--out"])
         .arg(&out)
         .arg(&input)
         .output()
@@ -350,6 +350,8 @@ fn refuses_a_dangling_symlink_at_the_target() {
     assert!(String::from_utf8(res.stderr)
         .unwrap()
         .contains("link to a missing file"));
+    let doc: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(doc["errors"][0]["code"], "write_failed");
     assert!(!missing.exists());
     assert_eq!(std::fs::read(&input).unwrap(), before);
 }
@@ -547,6 +549,51 @@ fn json_same_file() {
     assert_eq!(doc["results"].as_array().unwrap().len(), 0);
     assert_eq!(doc["errors"][0]["code"], "same_file");
     assert_eq!(doc["errors"][0]["file"], input.to_string_lossy().as_ref());
+    assert_eq!(
+        doc["errors"][0]["hint"],
+        "choose a different --out directory"
+    );
+}
+
+#[test]
+fn json_upscale_reports_the_factor() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let res = pixctl()
+        .args(["fit", "--json", "--font-px", "6", "--out"])
+        .arg(dir.path().join("out"))
+        .arg(&a)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(0));
+    let doc: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(doc["results"][0]["rule"], "upscale");
+    assert_eq!(doc["results"][0]["factor"], 2.0);
+}
+
+#[test]
+fn json_name_collision_with_three_inputs_names_the_first() {
+    let dir = TempDir::new().unwrap();
+    let mut inputs = Vec::new();
+    for ext in ["png", "jpg", "jpeg"] {
+        let sub = dir.path().join(format!("src-{ext}"));
+        std::fs::create_dir(&sub).unwrap();
+        let p = sub.join(format!("a.{ext}"));
+        RgbImage::from_pixel(100, 100, Rgb([0, 0, 0]))
+            .save(&p)
+            .unwrap();
+        inputs.push(p);
+    }
+    let refs: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
+    let (code, doc, _) = fit_json(&refs, &dir.path().join("out"));
+    assert_eq!(code, Some(2));
+    let errors = doc["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 2);
+    for e in errors {
+        assert_eq!(e["code"], "name_collision");
+        assert_eq!(e["with"], inputs[0].to_string_lossy().as_ref());
+        assert_eq!(e["hint"], "rename one of the inputs");
+    }
 }
 
 #[test]

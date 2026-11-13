@@ -1,7 +1,7 @@
 //! The `fit` command: writes one fitted PNG per input image.
 
 use crate::font;
-use crate::output::{Envelope, Failure};
+use crate::output::{self, lossy_path, Envelope, Failure};
 use crate::rule::{self, Rule};
 use crate::{fit, load};
 use serde::Serialize;
@@ -21,11 +21,6 @@ struct FitResult {
     factor: f32,
     width: u32,
     height: u32,
-}
-
-/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
-fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&path.to_string_lossy())
 }
 
 /// The totals of a `fit` run.
@@ -66,35 +61,37 @@ pub fn run(
     let mut results = Vec::new();
     let mut errors: Vec<Failure> = Vec::new();
     if let Err(e) = std::fs::create_dir_all(out_dir) {
-        errors.push(Failure {
+        let failure = Failure {
             code: "out_dir_failed",
             message: format!("cannot create {}: {e}", out_dir.display()),
             file: Some(out_dir.to_string_lossy().into_owned()),
             hint: None,
             with: None,
-        });
+        };
+        let _ = writeln!(err, "pixctl: {failure}");
+        errors.push(failure);
     } else {
-        // Maps each output name already written to the input that owns it.
+        // Maps each output name to the input that claimed it first.
         let mut written = HashMap::new();
         for path in images {
             match fit_one(path, images, out_dir, font_px, &mut written) {
                 Ok(result) => {
                     if !json {
                         if let Err(e) = writeln!(err, "{}", result.line()) {
+                            // `err` is broken, so this line cannot be told.
                             errors.push(io_failure(path, &e));
                         }
                     }
                     results.push(result);
                 }
-                Err(failure) => errors.push(failure),
+                Err(failure) => {
+                    let _ = writeln!(err, "pixctl: {failure}");
+                    errors.push(failure);
+                }
             }
         }
     }
     let mut code = if errors.is_empty() { 0 } else { 2 };
-    for failure in &errors {
-        // A failed write to `err` is already in `errors`, and cannot be told.
-        let _ = writeln!(err, "pixctl: {failure}");
-    }
     if json {
         let envelope = Envelope {
             schema: "pixctl/fit/v1".to_string(),
@@ -104,10 +101,7 @@ pub fn run(
             results,
             errors,
         };
-        let written = serde_json::to_writer_pretty(&mut *out, &envelope)
-            .map_err(anyhow::Error::from)
-            .and_then(|()| writeln!(out).map_err(anyhow::Error::from));
-        if let Err(e) = written {
+        if let Err(e) = output::write_envelope(out, &envelope) {
             let _ = writeln!(err, "pixctl: {e:#}");
             code = 2;
         }
@@ -128,11 +122,16 @@ fn io_failure(path: &Path, e: &std::io::Error) -> Failure {
 
 /// Builds a per-image failure. The message names the input path.
 fn failure(code: &'static str, path: &Path, reason: String, with: Option<&Path>) -> Failure {
+    let hint = match code {
+        "same_file" => Some("choose a different --out directory"),
+        "name_collision" => Some("rename one of the inputs"),
+        _ => None,
+    };
     Failure {
         code,
         message: format!("{}: {reason}", path.display()),
         file: Some(path.to_string_lossy().into_owned()),
-        hint: None,
+        hint: hint.map(str::to_string),
         with: with.map(|p| p.to_string_lossy().into_owned()),
     }
 }
@@ -186,7 +185,7 @@ fn fit_one(
 
 /// Refuses a target that would overwrite an input, reached directly, through
 /// a hard link or through a symbolic link, or that has the same name (ignoring
-/// case) as an output already written in this run. `path` is the input being
+/// case) as an output already claimed in this run. `path` is the input being
 /// fitted.
 fn guard_target(
     path: &Path,
@@ -230,7 +229,7 @@ fn guard_target(
             "name_collision",
             path,
             format!(
-                "the output {} was already written for another input",
+                "the output {} is already claimed by another input",
                 target.display()
             ),
             Some(earlier),
@@ -283,6 +282,83 @@ mod tests {
             }
         }
         img
+    }
+
+    /// A writer that always fails.
+    struct Broken;
+
+    impl Write for Broken {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("broken pipe"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A temporary directory holding one input image.
+    fn one_input() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::TempDir::new().unwrap();
+        let input = dir.path().join("a.png");
+        RgbaImage::from_pixel(100, 100, Rgba([255, 255, 255, 255]))
+            .save(&input)
+            .unwrap();
+        (dir, input)
+    }
+
+    #[test]
+    fn broken_stderr_makes_the_status_line_write_failed() {
+        let (dir, input) = one_input();
+        let mut out = Vec::new();
+        let code = run(
+            &[input],
+            &dir.path().join("out"),
+            None,
+            false,
+            &mut out,
+            &mut Broken,
+        );
+        assert_eq!(code, 2);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn status_line_write_failure_is_coded_write_failed() {
+        let failure = io_failure(Path::new("a.png"), &std::io::Error::other("broken pipe"));
+        assert_eq!(failure.code, "write_failed");
+        assert_eq!(failure.file.as_deref(), Some("a.png"));
+        assert!(failure.message.contains("broken pipe"));
+    }
+
+    #[test]
+    fn broken_stdout_makes_the_json_envelope_exit_2() {
+        let (dir, input) = one_input();
+        let mut err = Vec::new();
+        let code = run(
+            &[input],
+            &dir.path().join("out"),
+            None,
+            true,
+            &mut Broken,
+            &mut err,
+        );
+        assert_eq!(code, 2);
+        assert!(String::from_utf8(err).unwrap().contains("broken pipe"));
+    }
+
+    #[test]
+    fn same_file_and_name_collision_carry_a_hint() {
+        let same = failure("same_file", Path::new("a.png"), "r".into(), None);
+        assert_eq!(
+            same.hint.as_deref(),
+            Some("choose a different --out directory")
+        );
+        let clash = failure("name_collision", Path::new("a.png"), "r".into(), None);
+        assert_eq!(clash.hint.as_deref(), Some("rename one of the inputs"));
+        assert_eq!(
+            failure("write_failed", Path::new("a"), "r".into(), None).hint,
+            None
+        );
     }
 
     #[test]
