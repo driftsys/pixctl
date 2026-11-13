@@ -2,7 +2,7 @@
 
 use crate::font::{self, Confidence};
 use crate::load;
-use crate::output::{self, Envelope, Failure};
+use crate::output::{self, lossy_path, Envelope, Failure};
 use crate::rule::{self, Rule};
 use serde::Serialize;
 use std::io::Write;
@@ -38,20 +38,15 @@ pub struct Report {
     pub output_width: u32,
 }
 
-/// Serialises a path as a string; invalid UTF-8 becomes U+FFFD.
-fn lossy_path<S: serde::Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&path.to_string_lossy())
-}
-
 /// The totals of an `inspect` run. `images` counts the reports, not the inputs.
 #[derive(Debug, Default, Serialize)]
-pub struct Summary {
-    pub images: usize,
-    pub icon: usize,
-    pub unchanged: usize,
-    pub upscale: usize,
-    pub too_small: usize,
-    pub oversize: usize,
+struct Summary {
+    images: usize,
+    icon: usize,
+    unchanged: usize,
+    upscale: usize,
+    too_small: usize,
+    oversize: usize,
 }
 
 impl Summary {
@@ -117,9 +112,7 @@ pub fn run(
             summary,
             errors,
         };
-        serde_json::to_writer_pretty(&mut *out, &envelope)
-            .map_err(anyhow::Error::from)
-            .and_then(|()| writeln!(out).map_err(anyhow::Error::from))
+        output::write_envelope(out, &envelope)
     } else {
         reports
             .iter()

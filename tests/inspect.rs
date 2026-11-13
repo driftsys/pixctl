@@ -366,3 +366,45 @@ fn text_mode_omits_the_summary_when_every_input_fails() {
     assert_eq!(out.status.code(), Some(2));
     assert!(out.stdout.is_empty());
 }
+
+#[test]
+fn summary_counts_upscale_too_small_and_oversize() {
+    let dir = TempDir::new().unwrap();
+    let icon = blank_png(dir.path(), "icon.png", 40, 30);
+    let plain = blank_png(dir.path(), "plain.png", 300, 200);
+    let wide = blank_png(dir.path(), "wide.png", 800, 200);
+    let summary = |font: &str| {
+        let out = pixctl()
+            .args(["inspect", "--json", "--font-px", font])
+            .args([&icon, &plain, &wide])
+            .output()
+            .unwrap();
+        envelope_of(&out.stdout)["summary"].clone()
+    };
+    // 6 px text on 300 px is doubled; the 800 px image is oversize.
+    assert_eq!(
+        summary("6"),
+        serde_json::json!({
+            "images": 3, "icon": 1, "unchanged": 0,
+            "upscale": 1, "too_small": 0, "oversize": 1
+        })
+    );
+    // 5 px text cannot reach 11 px, even doubled.
+    assert_eq!(
+        summary("5"),
+        serde_json::json!({
+            "images": 3, "icon": 1, "unchanged": 0,
+            "upscale": 0, "too_small": 1, "oversize": 1
+        })
+    );
+    let out = pixctl()
+        .args(["inspect", "--font-px", "6"])
+        .args([&icon, &plain, &wide])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().last().unwrap(),
+        "3 images: 1 icon, 0 unchanged, 1 upscale, 0 too-small, 1 oversize"
+    );
+}
