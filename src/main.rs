@@ -1,6 +1,7 @@
 use clap::Parser;
 use pixctl::cli::{Cli, Command};
-use pixctl::{check, fit_cmd, inspect};
+use pixctl::{check, fit_cmd, inspect, output};
+use std::io::IsTerminal;
 
 fn main() {
     let cli = Cli::parse();
@@ -38,6 +39,11 @@ fn main() {
             strict,
             font_px,
             json,
+            output::color_enabled(
+                std::io::stdout().is_terminal(),
+                std::env::var("NO_COLOR").ok().as_deref(),
+                std::env::var("CLICOLOR_FORCE").ok().as_deref(),
+            ),
             &mut std::io::stdout().lock(),
             &mut std::io::stderr().lock(),
         ),
