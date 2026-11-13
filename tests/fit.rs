@@ -156,10 +156,16 @@ fn fit_output_passes_check() {
     let dir = TempDir::new().unwrap();
     let text = png(dir.path(), "a.png", 300, 200);
     let icon = png(dir.path(), "dot.png", 32, 32);
-    let cases: [(&str, &Path, &[&str], &str, (u32, u32)); 3] = [
-        ("unchanged", &text, &[], "unchanged", (334, 234)),
-        ("upscale", &text, &["--font-px", "6"], "upscale", (634, 434)),
-        ("icon", &icon, &[], "icon", (32, 32)),
+    let cases = [
+        ("unchanged", &text, &[][..], "unchanged", (334, 234)),
+        (
+            "upscale",
+            &text,
+            &["--font-px", "6"][..],
+            "upscale",
+            (634, 434),
+        ),
+        ("icon", &icon, &[][..], "icon", (32, 32)),
     ];
     for (label, input, extra, rule, size) in cases {
         let (code, stdout) = fit_with(dir.path(), label, input, extra);
