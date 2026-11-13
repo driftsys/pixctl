@@ -9,8 +9,8 @@ The contract has a 800 px column and a 766 px content width (800 − 2 × 17).
 
 - Gate the file as committed: `width` passes at 800 px or less, and the frame is
   part of the file.
-- Gate the content width (766 px or less). Rejected: a fitted image is 800 px
-  wide, so the output of `fit` would fail its own check.
+- Gate the content width (766 px or less). Rejected: a fitted image is at most
+  800 px wide, so the output of `fit` would fail its own check.
 
 ## Decision
 

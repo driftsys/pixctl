@@ -74,7 +74,8 @@ and gate committed images against the Markdown display contract (`check`).
   output name already written for another input in the same run are errors. Each
   is reported on stderr with its path, and the other images are still processed
   ([AD-0013](../decisions/0013-fit-output-naming.md)). The exit code is `2` if
-  any image failed, and `0` otherwise.
+  any image failed, and `0` otherwise. If the output directory cannot be
+  created, `fit` reports it once, writes no image and exits `2`.
 - The output of `fit` passes the `width`, `opaque` and `framed` checks whenever
   the rule is `icon`, `unchanged` or `upscale`.
 

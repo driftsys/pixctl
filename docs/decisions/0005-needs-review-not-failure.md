@@ -1,4 +1,4 @@
-# AD-0005 A review result is not a failure
+# AD-0005 `needs-review` is not a failure
 
 ## Context
 
@@ -11,9 +11,10 @@ Alternatives not documented.
 
 ## Decision
 
-`review` is the status that `check` produces for a `low` confidence. `check`
-prints `REVIEW` (`review` in JSON) and exits `0`; `--strict` turns REVIEW into
-FAIL (exit `1`). `inspect` reports only the confidence and exits `0` for it.
+The status that `check` produces for a `low` confidence is named `needs-review`
+in this record and `review` in the output. `check` prints `REVIEW` (`review` in
+JSON) and exits `0`; `--strict` turns REVIEW into FAIL (exit `1`). `inspect`
+reports only the confidence and exits `0` for it.
 
 ## Consequences
 

@@ -266,11 +266,12 @@ no interlacing.
 
 Two cases are errors for the image that causes them:
 
-- Two inputs that map to the same output name. Names that differ only in case,
-  such as `blank.png` and `BLANK.PNG`, count as the same name, because macOS and
-  Windows file systems store them as one file.
+- Two inputs that map to the same output name. Output names that differ only in
+  case, such as `blank.png` and `BLANK.PNG`, count as the same name, because
+  macOS and Windows file systems store them as one file.
 - An output that would overwrite an input, including an input that is reached
-  through a link.
+  through a hard link or a symbolic link. This test compares the files
+  themselves, so it follows the case rules of the file system.
 
 ```console
 $ pixctl fit blank.png BLANK.PNG --out o2
@@ -284,8 +285,9 @@ pixctl: same/blank.png: the output same/blank.png would overwrite an input
 ```
 
 The errors go to stderr, the other images are still written, and the exit code
-is `2`. The exit code is also `2` when an image cannot be loaded or the output
-lines cannot be written. It is `0` otherwise.
+is `2`. The exit code is also `2` when an image cannot be loaded, when the
+output lines cannot be written, or when the output directory cannot be created;
+in the last case no image is written. It is `0` otherwise.
 
 ## License
 
