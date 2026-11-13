@@ -20,10 +20,12 @@ estimate runs on the content inside the frame when the image is framed.
 
 ## Consequences
 
-`check` expects a fitted image. An unfitted image fails `framed`. `fit` output
-passes `width`, `opaque` and `framed` for the `icon`, `unchanged` and `upscale`
-rules; an integration test pins this. The `oversize` flag that
-[AD-0004](0004-upscale-rule.md) deferred to `check` is the `width` check on the
-committed file.
+`check` expects a fitted image. An unfitted image that is not an icon fails
+`framed`; an icon passes `framed` with the detail `icon`. `fit` output passes
+`width`, `opaque` and `framed` for the `icon`, `unchanged` and `upscale` rules;
+an integration test pins this. The `oversize` flag that
+[AD-0004](0004-upscale-rule.md) deferred to `check` is the `width` check, which
+fails an unfitted image wider than 800 px, and the `min-font-size` check, which
+fails a font that is too small.
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1)

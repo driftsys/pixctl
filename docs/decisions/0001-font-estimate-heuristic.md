@@ -17,8 +17,8 @@ later option behind the same `font::estimate` interface.
 
 ## Consequences
 
-- A low confidence is reported, not hidden; the future `check` turns it into
-  `needs-review` ([AD-0005](0005-needs-review-not-failure.md)).
+- A low confidence is reported, not hidden; `check` turns it into `REVIEW`
+  ([AD-0005](0005-needs-review-not-failure.md)).
 - The algorithm is described in [design/inspect.md](../design/inspect.md).
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1)

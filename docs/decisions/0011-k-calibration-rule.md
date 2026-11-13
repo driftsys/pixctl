@@ -21,7 +21,7 @@ is kept in the `K` doc comment in [`src/font.rs`](../../src/font.rs).
 
 ## Consequences
 
-`K` is fitted to three synthetic faces. It must be rechecked on the M2 real
-corpus and may need recalibration.
+`K` is fitted to three synthetic faces. It must be rechecked on a real corpus,
+which is not yet available, and may need recalibration.
 
 Satisfies: [AD-0001](0001-font-estimate-heuristic.md)

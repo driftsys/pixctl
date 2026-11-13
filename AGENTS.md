@@ -16,8 +16,9 @@ with the code it returns).
 
 - `cli.rs` — `clap` definitions of the commands and their arguments.
 - `contract.rs` — constants of the display contract (column, font, padding,
-  frame, icon size).
-- `load.rs` — decodes an image file to RGBA8 and detects transparent pixels.
+  frame, icon size) and its version.
+- `load.rs` — decodes an image file to RGBA8, detects transparent pixels and
+  flattens an image to greyscale.
 - `font.rs` — estimates the font size from the heights of the text lines.
 - `rule.rs` — chooses the fit rule, scale factor and output width.
 - `inspect.rs` — the `inspect` command: builds the reports and prints them as

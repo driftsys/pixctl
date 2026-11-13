@@ -54,12 +54,13 @@ the number in the version string to `CONTRACT_VERSION`.
 
 1. The font that drives the rule is the override, else a high-confidence
    estimate, else `None`, as in `inspect`.
-2. The output directory is created, then the target path is resolved to its real
-   path (an existing target is canonicalised so a link to an input is detected).
-3. The resolved name is compared case-insensitively against the canonical input
-   paths and against the outputs written so far
-   ([AD-0013](../decisions/0013-fit-output-naming.md)). A match is an error for
-   that image only.
+2. The output directory is created once, before the first image. A failure is
+   reported once and gives `2`.
+3. An existing target is compared by file identity with every input, so a hard
+   link or symbolic link to an input is detected; a symbolic link to a missing
+   file is refused. The resolved name is compared case-insensitively against the
+   outputs written so far ([AD-0013](../decisions/0013-fit-output-naming.md)). A
+   match is an error for that image only.
 4. The image is rendered, encoded and written; the `FIT` line is printed.
 
 ## Testing
@@ -70,6 +71,7 @@ the number in the version string to `CONTRACT_VERSION`.
   deterministic encoding without metadata chunks).
 - `tests/check.rs` and `tests/fit.rs` cover the commands: exit codes, `REVIEW`
   with and without `--strict`, the JSON shape, a missing file among valid ones,
-  JPEG input, output-name collisions, refusal to overwrite an input,
-  byte-identical runs, and that `fit` output passes `check`. `tests/cli.rs`
-  covers the version string and the flag shapes.
+  JPEG input, output-name collisions, refusal to overwrite an input (also
+  through a hard link, a symbolic link or a dangling link), byte-identical runs,
+  and that `fit` output passes `check`. `tests/cli.rs` covers the version string
+  and the flag shapes.

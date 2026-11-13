@@ -11,8 +11,11 @@ Alternatives not documented.
 
 ## Decision
 
-- `image` 0.25 for decoding, with default features off and only the PNG, JPEG,
-  BMP, GIF, TIFF and WebP decoders enabled.
+- `image` 0.25 for decoding, resizing and the first PNG encoding step, with
+  default features off and only the PNG, JPEG, BMP, GIF, TIFF and WebP codecs
+  enabled.
+- `same-file` to compare the identity of two paths, so that `fit` detects an
+  output that is a hard link or a symbolic link to an input.
 - `imageproc`, with default features off, for connected components. Its
   `otsu_level` is replaced by a local threshold
   ([AD-0010](0010-local-otsu-threshold.md)).

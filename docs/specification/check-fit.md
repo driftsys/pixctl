@@ -1,8 +1,8 @@
 # `check` and `fit` — requirements
 
 Scope source: [pixctl#1](https://github.com/driftsys/pixctl/issues/1).
-Implemented in the first release (v0.1.0), which merges the MVP milestones M2
-(`check`) and M3 (`fit`, PNG output). Decisions:
+Implemented in the first version, which merges the MVP milestones M2 (`check`)
+and M3 (`fit`, PNG output). Decisions:
 [AD-0002](../decisions/0002-contract-constants.md),
 [AD-0005](../decisions/0005-needs-review-not-failure.md) and
 [AD-0012](../decisions/0012-check-gates-the-fitted-file.md) to
@@ -33,7 +33,7 @@ and gate committed images against the Markdown display contract (`check`).
     when the estimate has low confidence and no `--font-px` is given.
   - `opaque`: fail when any pixel has alpha below 255.
   - `framed`: pass when the outer 1 px ring is exactly `#d0d7de` and the next 16
-    px ring is exactly `#ffffff`. An image smaller than 35 × 35 px is never
+    px ring is exactly `#ffffff`. An image with a side below 35 px is never
     framed.
 - An icon (longer side at most 64 px) passes `min-font-size` and `framed` with
   the detail `icon`.

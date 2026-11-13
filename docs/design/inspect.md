@@ -8,23 +8,25 @@ One crate. `src/lib.rs` declares the modules; `src/main.rs` is thin glue that
 parses the arguments, calls the commands. `check` and `fit` are in
 [check-fit.md](check-fit.md).
 
-| Module                                 | Purpose                                                                         |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
-| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                    |
-| [`contract.rs`](../../src/contract.rs) | display contract constants ([AD-0002](../decisions/0002-contract-constants.md)) |
-| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255            |
-| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                     |
-| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                 |
-| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                       |
+| Module                                 | Purpose                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                |
+| [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md)) |
+| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`     |
+| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                 |
+| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                             |
+| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                   |
 
 ## Interfaces
 
-- `contract`: `COLUMN = 800`, `MIN_FONT_PX = 11`, `TARGET_FONT_PX = 12`,
-  `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`, `ICON_MAX = 64`,
-  `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
+- `contract`: `CONTRACT_VERSION = 1`, `COLUMN = 800`, `MIN_FONT_PX = 11`,
+  `TARGET_FONT_PX = 12`, `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`,
+  `ICON_MAX = 64`, `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
 - `load::load(path) -> Result<Loaded { rgba, has_alpha }>`. Paths ending in
   `.emf`/`.wmf` (any case) return an error that contains `unsupported`. Errors
   carry the path.
+- `load::flatten_to_gray(&RgbaImage) -> GrayImage` composites onto white and
+  converts to greyscale.
 - `font::estimate` returns `px: Option<f32>`, `confidence: High | Low`, and the
   `lines` and `glyphs` counts.
 - `rule::plan` returns `Plan { rule, factor, output_width }`. `None` as the font

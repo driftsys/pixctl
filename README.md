@@ -67,10 +67,10 @@ Without `--json`, it prints one line per image. With `--json`, it prints a
 pretty-printed array with one object per image that loaded:
 
 ```console
-$ pixctl inspect --json blank.png
+$ pixctl inspect --json wide.png
 [
   {
-    "path": "blank.png",
+    "path": "wide.png",
     "width": 1200,
     "height": 400,
     "alpha": false,
@@ -114,7 +114,7 @@ image, in this order:
   image is framed, the estimate uses the content inside the frame.
 - `opaque`: fails when any pixel has an alpha value below 255.
 - `framed`: passes when the outer 1 px ring is exactly `#d0d7de` and the 16 px
-  band inside it is exactly white. An image smaller than 35 by 35 px is never
+  band inside it is exactly white. An image with a side below 35 px is never
   framed.
 
 An icon is an image whose larger side is at most 64 px. It passes
@@ -241,8 +241,8 @@ FIT  [upscale] blank.png  up/blank.png (484×334)
 
 The output of an `icon`, `unchanged` or `upscale` image passes the `width`,
 `opaque` and `framed` checks. `min-font-size` still depends on the text in the
-image: these test images have no text, so they get `REVIEW`, which fails under
-`--strict`.
+image: the test images `blank.png` and `clear.png` have no text, so they get
+`REVIEW`, which fails under `--strict`; the icon `dot.png` passes.
 
 ```console
 $ pixctl check fitted/blank.png fitted/dot.png fitted/clear.png
