@@ -2,8 +2,8 @@
 
 ## Context
 
-pixctl and diagctl share the same display contract (column, font, padding,
-frame).
+pixctl and diagctl share the same display contract: the column width and the
+minimum displayed font.
 
 ## Options
 
@@ -18,9 +18,15 @@ mirrored by hand with diagctl
 `pixctl --version` reports it as `(display contract 1)`. A unit test pins the
 number in the version string to the constant.
 
+The padding and the frame belong to pixctl only. Diagram SVGs from diagctl carry
+no padding and no frame. Both tools apply one shared rule: the image the reader
+sees is at most 800 px wide. The user decided this on 2026-11-13, and
+[diagctl PR #31](https://github.com/driftsys/diagctl/pull/31) records it.
+
 ## Consequences
 
-A change to the contract must be made in both repositories by hand, and the
-version bumped in both.
+A change to a shared constant (the column width or the minimum font) must be
+made in both repositories by hand, and the version bumped in both. Nothing is
+shared as code between the repositories.
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1)
