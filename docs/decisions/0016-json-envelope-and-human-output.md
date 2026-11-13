@@ -2,9 +2,9 @@
 
 ## Context
 
-The user decided on 2026-11-13 that tblctl, pixctl and diagctl share one output
-convention, aligned with [clig.dev](https://clig.dev). It is recorded in tblctl
-as AD-0005 (driftsys/tblctl,
+The user decided on 2026-11-13 that pixctl follows the output convention of
+tblctl, aligned with [clig.dev](https://clig.dev); diagctl is asked to adopt it
+too. The convention is recorded in tblctl as AD-0005 (driftsys/tblctl,
 `docs/decisions/0005-json-envelope-and-human-output.md`). pixctl adopts it
 before the v0.1.0 tag, so the first release does not ship the bare-array JSON of
 [AD-0014](0014-check-output-format.md). Agents and scripts need results, totals
@@ -51,8 +51,10 @@ pixctl mirrors tblctl AD-0005.
 
 ## Consequences
 
-Consumers of the earlier bare array, and of `FIT` lines on stdout, must change.
-Any change to the envelope is made together with the other two tools.
+Before this change, `check` and `fit` wrote a bare JSON array, and `fit` wrote
+its `FIT` lines to stdout. No release shipped that output, so no released
+consumer has to change. Any change to the envelope is made together with tblctl,
+and with diagctl once it adopts the convention.
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1), tblctl
 AD-0005

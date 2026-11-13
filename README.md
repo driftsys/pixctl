@@ -66,8 +66,8 @@ stdout, also when there are errors. The keys come in this order:
 `schema` is `pixctl/inspect/v1`, `pixctl/check/v1` or `pixctl/fit/v1`. `results`
 holds the objects of the command, `summary` its totals, and `errors` the coded
 errors. When every input fails, the envelope is still written, with empty
-`results`, and the exit code is `2`. `tblctl` and `diagctl` use the same
-envelope.
+`results`, and the exit code is `2`. The format matches tblctl AD-0005; diagctl
+is asked to adopt it.
 
 Each error object has `code` and `message`. It has `file` when a file is
 involved, `hint` when there is one, and `with` for a `name_collision`. Each
@@ -77,18 +77,19 @@ text with exit code `2` and no envelope.
 
 ### Error codes
 
-| Code               | Meaning                                             | `file`               |
-| ------------------ | --------------------------------------------------- | -------------------- |
-| `read_failed`      | The file cannot be opened or decoded.               | the input            |
-| `unsupported_type` | The file is EMF or WMF.                             | the input            |
-| `out_dir_failed`   | `fit` cannot create the `--out` directory.          | the output directory |
-| `same_file`        | The output would overwrite an input.                | the input            |
-| `name_collision`   | Two inputs map to one output name.                  | the later input      |
-| `write_failed`     | `fit` cannot write the output, or a link blocks it. | the input            |
+| Code               | Meaning                                               | `file`               |
+| ------------------ | ----------------------------------------------------- | -------------------- |
+| `read_failed`      | The file cannot be opened or decoded, or has no stem. | the input            |
+| `unsupported_type` | The file is EMF or WMF.                               | the input            |
+| `out_dir_failed`   | `fit` cannot create the `--out` directory.            | the output directory |
+| `same_file`        | The output would overwrite an input.                  | the input            |
+| `name_collision`   | Two inputs map to one output name.                    | the later input      |
+| `write_failed`     | `fit` cannot write the output, or a link blocks it.   | the input            |
 
 For `name_collision`, `with` is the earlier input, which owns the output name.
-This is the `errors` entry of `pixctl check --json blank.png missing.png`; the
-`results` hold the checks of `blank.png`:
+The following is the `errors` entry of
+`pixctl check --json blank.png missing.png`; the `results` hold the checks of
+`blank.png`:
 
 ```json
 {
@@ -107,7 +108,7 @@ One image is written `1 image`. When every input fails, the line is left out.
 - `check`: `N images: P passed, F failed, R review`, counted per image
 
 `fit` has no summary line. Its `FIT` lines go to stderr, so stdout stays empty
-in text mode. Earlier versions wrote them to stdout; read them from stderr, or
+in text mode. Before this change they went to stdout; read them from stderr, or
 use `--json`.
 
 ### Colour
@@ -115,8 +116,8 @@ use `--json`.
 In text mode, the tags `PASS` (green), `FAIL` (red) and `REVIEW` (yellow) are
 coloured when stdout is a terminal. A non-empty `NO_COLOR` turns colour off. A
 non-empty `CLICOLOR_FORCE` turns it on when stdout is not a terminal; `NO_COLOR`
-wins when both are set. The columns line up with and without colour, and JSON
-output never contains colour codes.
+wins when both are set. The visible text is the same with and without colour,
+and JSON output never contains colour codes.
 
 ```console
 $ CLICOLOR_FORCE=1 pixctl check dot.png | head -n 1 | cat -v
@@ -346,8 +347,8 @@ FIT  [icon] dot.png  fitted/dot.png (32×32)
 ```
 
 With `--json`, `fit` prints the [envelope](#output) and writes no `FIT` line.
-`results` holds one object per image written, and `summary` is the number of
-images written:
+`results` holds one object per image written, and `summary` has the number of
+images written, as `written`:
 
 ```console
 $ pixctl fit --json blank.png dot.png --out j
@@ -425,7 +426,7 @@ Two cases are errors for the image that causes them, with the codes
 ```console
 $ pixctl fit blank.png BLANK.PNG --out o2
 FIT  [unchanged] blank.png  o2/blank.png (334×234)
-pixctl: BLANK.PNG: the output o2/BLANK.png was already written for another input
+pixctl: BLANK.PNG: the output o2/BLANK.png is already claimed by another input
 ```
 
 ```console
@@ -437,7 +438,7 @@ With `--json`, the collision names the earlier input in `with`:
 
 ```console
 $ pixctl fit --json blank.png BLANK.PNG --out o3
-pixctl: BLANK.PNG: the output o3/BLANK.png was already written for another input
+pixctl: BLANK.PNG: the output o3/BLANK.png is already claimed by another input
 {
   "schema": "pixctl/fit/v1",
   "results": [
@@ -456,7 +457,7 @@ pixctl: BLANK.PNG: the output o3/BLANK.png was already written for another input
   "errors": [
     {
       "code": "name_collision",
-      "message": "BLANK.PNG: the output o3/BLANK.png was already written for another input",
+      "message": "BLANK.PNG: the output o3/BLANK.png is already claimed by another input",
       "file": "BLANK.PNG",
       "with": "blank.png"
     }

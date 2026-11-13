@@ -62,7 +62,7 @@ and gate committed images against the Markdown display contract (`check`).
 
 ## `fit`
 
-`pixctl fit <image>... --out DIR [--font-px F]`
+`pixctl fit <image>... --out DIR [--font-px F] [--json]`
 
 - `fit` writes `<DIR>/<file stem>.png` for each input and creates `DIR` when it
   is missing.
@@ -82,7 +82,7 @@ and gate committed images against the Markdown display contract (`check`).
 - The output bytes are the same on every run for the same input and the same
   version ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
 - An input that fails to load, an output that would overwrite an input, and an
-  output name already written for another input in the same run are errors. Each
+  output name already claimed by another input in the same run are errors. Each
   is reported as a coded error with its path, and the other images are still
   processed ([AD-0013](../decisions/0013-fit-output-naming.md)). The exit code
   is `2` if any image failed, and `0` otherwise. If the output directory cannot

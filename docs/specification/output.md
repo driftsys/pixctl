@@ -1,7 +1,7 @@
 # Output convention — requirements
 
 Scope source: [pixctl#1](https://github.com/driftsys/pixctl/issues/1). The
-convention is shared with tblctl and diagctl and follows
+format matches tblctl AD-0005, and diagctl is asked to adopt it. It follows
 [clig.dev](https://clig.dev). Decision:
 [AD-0016](../decisions/0016-json-envelope-and-human-output.md), which mirrors
 tblctl AD-0005. It applies to `inspect`, `check` and `fit`; the commands are in
@@ -49,8 +49,8 @@ A dangling symbolic link at the `fit` target is also `write_failed`.
 
 - Colour applies only to the `PASS`, `FAIL` and `REVIEW` tags of `check`: green,
   red and yellow. It is on when stdout is a terminal, or when `CLICOLOR_FORCE`
-  is non-empty. A non-empty `NO_COLOR` turns it off and wins. The alignment is
-  the same with and without colour. ANSI codes never appear in JSON.
+  is non-empty. A non-empty `NO_COLOR` turns it off and wins. The visible text
+  is the same with and without colour. ANSI codes never appear in JSON.
 - A count of one is written `1 image`.
 - Every command's `--help` has an `Examples:` section. The top-level help ends
   with a link to the README.

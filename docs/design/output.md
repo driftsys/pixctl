@@ -39,8 +39,11 @@ command builds its results, summary and errors, then prints them in one place.
    when at least one image loaded. `fit` writes its `FIT` lines to `err`.
 5. A failure to write the envelope or the text output gives exit `2`.
 
-`fit` messages name the input path. A `name_collision` keeps a map from each
-output name to the input that wrote it, which gives `with`.
+`fit` messages name the input path, except `out_dir_failed`, which names the
+output directory. A `name_collision` keeps a map from each output name to the
+input that claimed it first, which gives `with`. The name is claimed before the
+write, so it stays claimed if that write fails. `same_file` and `name_collision`
+carry a `hint`.
 
 ## Testing
 
@@ -49,5 +52,7 @@ counts as unset), the exact escape bytes, `count` and the omission of absent
 `Failure` fields. `tests/inspect.rs`, `tests/check.rs` and `tests/fit.rs` cover
 the envelope key order and schema, a mixed run, a run where every input fails,
 `--strict` with a review image, the summary lines, colour with `CLICOLOR_FORCE`
-and `NO_COLOR`, an empty stdout for `fit` in text mode, and each error code that
-can be triggered. `tests/cli.rs` covers the `Examples:` help sections.
+and `NO_COLOR`, an empty stdout for `fit` in text mode, and the codes
+`read_failed`, `unsupported_type`, `out_dir_failed`, `same_file`,
+`name_collision` and `write_failed` (a blocked target, and a broken stderr or
+stdout writer). `tests/cli.rs` covers the `Examples:` help sections.
