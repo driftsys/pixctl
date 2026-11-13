@@ -1,6 +1,6 @@
 [package]
 name = "pixctl"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 description = "Hermetic CLI that fits raster images for Markdown docs (PNG/WebP, display gate)"
 license = "MIT"
