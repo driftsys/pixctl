@@ -68,8 +68,9 @@ pub fn encode_png(img: &RgbImage) -> Result<Vec<u8>> {
     oxipng::optimize_from_memory(&raw, &options()).context("cannot optimise PNG")
 }
 
-/// The oxipng settings: a fixed preset, all metadata chunks stripped and no
-/// interlacing. Changing them changes the bytes of every fitted PNG.
+/// The oxipng settings: preset 2, all metadata chunks stripped and no
+/// interlacing. Changing the preset can change the bytes of every fitted PNG
+/// ([AD-0015](../docs/decisions/0015-deterministic-png-encoding.md)).
 fn options() -> oxipng::Options {
     let mut opts = oxipng::Options::from_preset(2);
     opts.strip = oxipng::StripChunks::All;
@@ -159,6 +160,13 @@ mod tests {
         // cannot show these two settings; the options are checked directly.
         let opts = options();
         assert!(matches!(opts.strip, oxipng::StripChunks::All));
+        let preset = oxipng::Options::from_preset(2);
+        assert_eq!(opts.filters, preset.filters);
+        assert_eq!(opts.fast_evaluation, preset.fast_evaluation);
+        assert_eq!(
+            format!("{:?}", opts.deflater),
+            format!("{:?}", preset.deflater)
+        );
         assert_eq!(opts.interlace, Some(false));
     }
 
@@ -201,10 +209,16 @@ mod tests {
     }
 
     #[test]
-    fn smoothing_filter_keeps_a_flat_colour() {
-        let img = RgbaImage::from_pixel(300, 200, Rgba([200, 100, 50, 255]));
-        let out = render(&img, &plan_of(Rule::Upscale, 1.5, 484));
-        assert_eq!(out.get_pixel(17 + 100, 17 + 100).0, [200, 100, 50]);
+    fn upscale_1_5x_is_lanczos3() {
+        let img = RgbaImage::from_fn(40, 30, |x, y| {
+            Rgba([(x * 6) as u8, (y * 8) as u8, ((x * y) % 256) as u8, 255])
+        });
+        let out = render(&img, &plan_of(Rule::Upscale, 1.5, 60 + 34));
+        let expected = imageops::resize(&flatten(&img), 60, 45, FilterType::Lanczos3);
+        let band = PADDING + FRAME;
+        for (x, y, p) in expected.enumerate_pixels() {
+            assert_eq!(out.get_pixel(x + band, y + band), p, "({x},{y})");
+        }
     }
 
     #[test]
