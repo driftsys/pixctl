@@ -77,14 +77,14 @@ text with exit code `2` and no envelope.
 
 ### Error codes
 
-| Code               | Meaning                                               | `file`               |
-| ------------------ | ----------------------------------------------------- | -------------------- |
-| `read_failed`      | The file cannot be opened or decoded, or has no stem. | the input            |
-| `unsupported_type` | The file is EMF or WMF.                               | the input            |
-| `out_dir_failed`   | `fit` cannot create the `--out` directory.            | the output directory |
-| `same_file`        | The output would overwrite an input.                  | the input            |
-| `name_collision`   | Two inputs map to one output name.                    | the later input      |
-| `write_failed`     | `fit` cannot write the output, or a link blocks it.   | the input            |
+| Code               | Meaning                                                              | `file`               |
+| ------------------ | -------------------------------------------------------------------- | -------------------- |
+| `read_failed`      | The file cannot be opened or decoded, or has no stem.                | the input            |
+| `unsupported_type` | The file is EMF or WMF.                                              | the input            |
+| `out_dir_failed`   | `fit` cannot create the `--out` directory.                           | the output directory |
+| `same_file`        | The output would overwrite an input.                                 | the input            |
+| `name_collision`   | Two inputs map to one output name.                                   | the later input      |
+| `write_failed`     | `fit` cannot write the output or a status line, or a link blocks it. | the input            |
 
 For `name_collision`, `with` is the earlier input, which owns the output name.
 The following is the `errors` entry of
@@ -459,6 +459,7 @@ pixctl: BLANK.PNG: the output o3/BLANK.png is already claimed by another input
       "code": "name_collision",
       "message": "BLANK.PNG: the output o3/BLANK.png is already claimed by another input",
       "file": "BLANK.PNG",
+      "hint": "rename one of the inputs",
       "with": "blank.png"
     }
   ]

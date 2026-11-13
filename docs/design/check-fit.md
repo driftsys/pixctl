@@ -67,7 +67,7 @@ the number in the version string to `CONTRACT_VERSION`.
 3. An existing target is compared by file identity with every input, so a hard
    link or symbolic link to an input is detected; a symbolic link to a missing
    file is refused. The resolved name is compared case-insensitively against the
-   outputs written so far ([AD-0013](../decisions/0013-fit-output-naming.md)). A
+   outputs claimed so far ([AD-0013](../decisions/0013-fit-output-naming.md)). A
    match is an error for that image only (`same_file`, `name_collision` with the
    earlier input in `with`, or `write_failed` for a dangling link).
 4. The image is rendered, encoded and written. A render, encode or write error

@@ -10,7 +10,7 @@ tblctl AD-0005. It applies to `inspect`, `check` and `fit`; the commands are in
 ## Intent
 
 An agent or a script gets the results, the totals and the coded errors of a run
-from one JSON document. A person gets a short, aligned text output.
+from one JSON document. A person gets a short text output.
 
 ## JSON envelope
 

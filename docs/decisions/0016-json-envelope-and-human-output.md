@@ -51,8 +51,8 @@ pixctl mirrors tblctl AD-0005.
 
 ## Consequences
 
-Before this change, `check` and `fit` wrote a bare JSON array, and `fit` wrote
-its `FIT` lines to stdout. No release shipped that output, so no released
+Before this change, `inspect` and `check` wrote a bare JSON array, and `fit`
+wrote its `FIT` lines to stdout. No release shipped that output, so no released
 consumer has to change. Any change to the envelope is made together with tblctl,
 and with diagctl once it adopts the convention.
 

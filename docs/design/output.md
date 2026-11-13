@@ -49,10 +49,12 @@ carry a `hint`.
 
 Unit tests in `output.rs` cover all colour combinations (an empty `NO_COLOR`
 counts as unset), the exact escape bytes, `count` and the omission of absent
-`Failure` fields. `tests/inspect.rs`, `tests/check.rs` and `tests/fit.rs` cover
-the envelope key order and schema, a mixed run, a run where every input fails,
-`--strict` with a review image, the summary lines, colour with `CLICOLOR_FORCE`
-and `NO_COLOR`, an empty stdout for `fit` in text mode, and the codes
-`read_failed`, `unsupported_type`, `out_dir_failed`, `same_file`,
-`name_collision` and `write_failed` (a blocked target, and a broken stderr or
-stdout writer). `tests/cli.rs` covers the `Examples:` help sections.
+`Failure` fields. Unit tests in `fit_cmd.rs` cover a broken stdout or stderr
+writer, the order of error lines, the hints and the claimed output name.
+`tests/inspect.rs`, `tests/check.rs` and `tests/fit.rs` cover the envelope key
+order and schema, a mixed run, a run where every input fails, `--strict` with a
+review image, the summary lines, colour with `CLICOLOR_FORCE` and `NO_COLOR`, an
+empty stdout for `fit` in text mode, and the codes `read_failed`,
+`unsupported_type`, `out_dir_failed`, `same_file`, `name_collision` and
+`write_failed` (a blocked target). `tests/cli.rs` covers the `Examples:` help
+sections.
