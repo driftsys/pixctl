@@ -1,6 +1,6 @@
 use clap::Parser;
 use pixctl::cli::{Cli, Command};
-use pixctl::inspect;
+use pixctl::{check, inspect};
 
 const TRACKING: &str = "https://github.com/driftsys/pixctl/issues/1";
 
@@ -24,7 +24,20 @@ fn main() {
             &mut std::io::stderr().lock(),
         )),
         Command::Fit { .. } => not_yet_implemented("fit"),
-        Command::Check { .. } => not_yet_implemented("check"),
+        Command::Check {
+            images,
+            strict,
+            font_px,
+            json,
+            ..
+        } => Ok(check::run(
+            &images,
+            strict,
+            font_px,
+            json,
+            &mut std::io::stdout().lock(),
+            &mut std::io::stderr().lock(),
+        )),
     };
     match result {
         Ok(code) => std::process::exit(code),

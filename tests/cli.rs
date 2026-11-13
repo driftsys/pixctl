@@ -28,16 +28,11 @@ fn help_lists_all_subcommands() {
 
 #[test]
 fn stubs_exit_2_with_tracking_link() {
-    for args in [
-        &["fit", "a.png", "--out", "out"][..],
-        &["check", "a.png"][..],
-    ] {
-        pixctl()
-            .args(args)
-            .assert()
-            .code(2)
-            .stderr(contains("not yet implemented"));
-    }
+    pixctl()
+        .args(["fit", "a.png", "--out", "out"])
+        .assert()
+        .code(2)
+        .stderr(contains("not yet implemented"));
 }
 
 #[test]

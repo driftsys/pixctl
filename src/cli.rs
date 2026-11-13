@@ -43,7 +43,7 @@ pub enum Command {
         /// Display target
         #[arg(long, value_enum, default_value_t = Target::Markdown)]
         target: Target,
-        /// Treat warnings as failures
+        /// Treat REVIEW results as failures (exit 1)
         #[arg(long)]
         strict: bool,
         /// Use this font size in pixels instead of the estimate

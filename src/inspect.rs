@@ -4,7 +4,6 @@ use crate::font::{self, Confidence};
 use crate::load;
 use crate::rule::{self, Rule};
 use anyhow::Result;
-use image::{GrayImage, Luma};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -95,7 +94,7 @@ fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report> {
             source: FontSource::Override,
         },
         None => {
-            let e = font::estimate(&flatten_to_gray(&loaded.rgba));
+            let e = font::estimate(&load::flatten_to_gray(&loaded.rgba));
             FontReport {
                 px: e.px,
                 confidence: e.confidence,
@@ -120,17 +119,6 @@ fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report> {
         rule: plan.rule,
         factor: plan.factor,
         output_width: plan.output_width,
-    })
-}
-
-/// Composites RGBA onto white, then converts to Rec. 601 luma.
-fn flatten_to_gray(rgba: &image::RgbaImage) -> GrayImage {
-    GrayImage::from_fn(rgba.width(), rgba.height(), |x, y| {
-        let [r, g, b, a] = rgba.get_pixel(x, y).0;
-        let a = a as f32 / 255.0;
-        let over_white = |c: u8| c as f32 * a + 255.0 * (1.0 - a);
-        let luma = 0.299 * over_white(r) + 0.587 * over_white(g) + 0.114 * over_white(b);
-        Luma([luma.round().clamp(0.0, 255.0) as u8])
     })
 }
 
@@ -164,19 +152,6 @@ fn plain_line(r: &Report) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{Rgba, RgbaImage};
-
-    #[test]
-    fn flatten_composites_onto_white() {
-        let mut img = RgbaImage::new(3, 1);
-        img.put_pixel(0, 0, Rgba([0, 0, 0, 0]));
-        img.put_pixel(1, 0, Rgba([0, 0, 0, 255]));
-        img.put_pixel(2, 0, Rgba([0, 0, 0, 128]));
-        let gray = flatten_to_gray(&img);
-        assert_eq!(gray.get_pixel(0, 0).0[0], 255);
-        assert_eq!(gray.get_pixel(1, 0).0[0], 0);
-        assert_eq!(gray.get_pixel(2, 0).0[0], 127);
-    }
 
     /// A writer that always fails.
     struct Broken;

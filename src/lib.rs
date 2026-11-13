@@ -1,3 +1,5 @@
+pub mod check;
+pub mod checks;
 pub mod cli;
 pub mod contract;
 pub mod font;
