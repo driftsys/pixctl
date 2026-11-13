@@ -140,3 +140,43 @@ fn rule_name(rule: rule::Rule) -> String {
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgba, RgbaImage};
+
+    /// Black blocks, `h` px high, on white: `rows` lines of `per_row` blocks.
+    fn text_like(rows: u32, per_row: u32, h: u32) -> RgbaImage {
+        let mut img =
+            RgbaImage::from_pixel(8 + per_row * 10, 8 + rows * 30, Rgba([255, 255, 255, 255]));
+        for r in 0..rows {
+            for c in 0..per_row {
+                for y in 0..h {
+                    for x in 0..6 {
+                        img.put_pixel(4 + c * 10 + x, 4 + r * 30 + y, Rgba([0, 0, 0, 255]));
+                    }
+                }
+            }
+        }
+        img
+    }
+
+    #[test]
+    fn low_confidence_estimate_is_not_used() {
+        // Two lines are too few: the estimate has a size but low confidence.
+        let low = text_like(2, 12, 5);
+        let e = font::estimate(&load::flatten_to_gray(&low));
+        assert!(e.px.is_some_and(|px| px < 11.0), "{e:?}");
+        assert_eq!(e.confidence, font::Confidence::Low);
+        assert_eq!(chosen_font(&low, None), None);
+    }
+
+    #[test]
+    fn high_confidence_estimate_is_used_and_override_wins() {
+        let high = text_like(3, 12, 5);
+        let px = chosen_font(&high, None).expect("a high-confidence size");
+        assert!(px < 11.0, "{px}");
+        assert_eq!(chosen_font(&high, Some(7.0)), Some(7.0));
+    }
+}
