@@ -5,7 +5,8 @@ Requirements: [specification/inspect.md](../specification/inspect.md).
 ## Components
 
 One crate. `src/lib.rs` declares the modules; `src/main.rs` is thin glue that
-parses the arguments, calls `inspect`, and stubs `fit` and `check`.
+parses the arguments, calls the commands. `check` and `fit` are in
+[check-fit.md](check-fit.md).
 
 | Module                                 | Purpose                                                                         |
 | -------------------------------------- | ------------------------------------------------------------------------------- |
