@@ -4,7 +4,7 @@
 use crate::contract::{FRAME, FRAME_COLOUR, PADDING};
 use crate::rule::{Plan, Rule};
 use anyhow::{Context, Result};
-use image::codecs::png::PngEncoder;
+use image::codecs::png::{CompressionType, FilterType as PngFilter, PngEncoder};
 use image::imageops::{self, FilterType};
 use image::{ExtendedColorType, ImageEncoder, Rgb, RgbImage, RgbaImage};
 
@@ -53,11 +53,18 @@ fn flatten(rgba: &RgbaImage) -> RgbImage {
     })
 }
 
-/// Encodes `img` as a PNG with a fixed oxipng preset, no metadata and no
-/// interlacing, so the same image always gives the same bytes.
+/// Compression level of the PNG encoder.
+const PNG_COMPRESSION: CompressionType = CompressionType::Best;
+/// Row filter of the PNG encoder: chosen per row by a heuristic.
+const PNG_FILTER: PngFilter = PngFilter::Adaptive;
+
+/// Encodes `img` as a PNG with fixed encoder settings, no metadata and no
+/// interlacing, so the same image always gives the same bytes. The encoder is
+/// pure Rust, so the static musl build needs no C compiler for it
+/// ([AD-0015](../docs/decisions/0015-deterministic-png-encoding.md)).
 pub fn encode_png(img: &RgbImage) -> Result<Vec<u8>> {
-    let mut raw = Vec::new();
-    PngEncoder::new(&mut raw)
+    let mut bytes = Vec::new();
+    PngEncoder::new_with_quality(&mut bytes, PNG_COMPRESSION, PNG_FILTER)
         .write_image(
             img.as_raw(),
             img.width(),
@@ -65,17 +72,7 @@ pub fn encode_png(img: &RgbImage) -> Result<Vec<u8>> {
             ExtendedColorType::Rgb8,
         )
         .context("cannot encode PNG")?;
-    oxipng::optimize_from_memory(&raw, &options()).context("cannot optimise PNG")
-}
-
-/// The oxipng settings: preset 2, all metadata chunks stripped and no
-/// interlacing. Changing the preset can change the bytes of every fitted PNG
-/// ([AD-0015](../docs/decisions/0015-deterministic-png-encoding.md)).
-fn options() -> oxipng::Options {
-    let mut opts = oxipng::Options::from_preset(2);
-    opts.strip = oxipng::StripChunks::All;
-    opts.interlace = Some(false);
-    opts
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -155,19 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn oxipng_options_strip_metadata_and_do_not_interlace() {
-        // The encoder never writes metadata chunks, so the output bytes
-        // cannot show these two settings; the options are checked directly.
-        let opts = options();
-        assert!(matches!(opts.strip, oxipng::StripChunks::All));
-        let preset = oxipng::Options::from_preset(2);
-        assert_eq!(opts.filters, preset.filters);
-        assert_eq!(opts.fast_evaluation, preset.fast_evaluation);
-        assert_eq!(
-            format!("{:?}", opts.deflater),
-            format!("{:?}", preset.deflater)
-        );
-        assert_eq!(opts.interlace, Some(false));
+    fn encoder_settings_are_pinned() {
+        assert!(matches!(PNG_COMPRESSION, CompressionType::Best));
+        assert!(matches!(PNG_FILTER, PngFilter::Adaptive));
     }
 
     fn assert_border(out: &RgbImage) {
