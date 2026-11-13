@@ -9,20 +9,27 @@ Sibling of [`diagctl`](https://github.com/driftsys/diagctl). Scope: issue
 [#1](https://github.com/driftsys/pixctl/issues/1).
 
 Rust 2021, `clap` derive. Exit contract: `0` clean · `1` ≥1 check failed · `2`
-operational error (`main.rs` maps `Err` → 2).
+operational error (each command maps its own errors to 2 and `main.rs` exits
+with the code it returns).
 
 ## Modules
 
 - `cli.rs` — `clap` definitions of the commands and their arguments.
 - `contract.rs` — constants of the display contract (column, font, padding,
-  frame, icon size).
-- `load.rs` — decodes an image file to RGBA8 and detects transparent pixels.
+  frame, icon size) and its version.
+- `load.rs` — decodes an image file to RGBA8, detects transparent pixels and
+  flattens an image to greyscale.
 - `font.rs` — estimates the font size from the heights of the text lines.
 - `rule.rs` — chooses the fit rule, scale factor and output width.
 - `inspect.rs` — the `inspect` command: builds the reports and prints them as
   plain lines or JSON.
-- `main.rs` — thin glue: parses the arguments, calls `inspect`, and stubs `fit`
-  and `check`.
+- `checks.rs` — the four display checks (`width`, `min-font-size`, `opaque`,
+  `framed`) on one decoded image.
+- `check.rs` — the `check` command: runs the checks and prints PASS, FAIL and
+  REVIEW lines or JSON.
+- `fit.rs` — renders an image to the display contract and encodes the PNG.
+- `fit_cmd.rs` — the `fit` command: writes one fitted PNG per input.
+- `main.rs` — thin glue: parses the arguments and calls the commands.
 
 ## Build commands
 

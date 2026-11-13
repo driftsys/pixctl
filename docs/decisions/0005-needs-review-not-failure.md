@@ -11,12 +11,14 @@ Alternatives not documented.
 
 ## Decision
 
-`needs-review` is the status that `check` (M2) produces for a `low` confidence.
-`check` prints `REVIEW` and exits `0`; `--strict` turns REVIEW into FAIL (exit
-`1`). `inspect` reports only the confidence and exits `0` for it.
+The status that `check` produces for a `low` confidence is named `needs-review`
+in this record and `review` in the output. `check` prints `REVIEW` (`review` in
+JSON) and exits `0`; `--strict` turns REVIEW into FAIL (exit `1`). `inspect`
+reports only the confidence and exits `0` for it.
 
 ## Consequences
 
-`check` and `--strict` are not implemented yet (M2).
+`check` and `--strict` are implemented; the output format is in
+[AD-0014](0014-check-output-format.md).
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1)

@@ -24,9 +24,11 @@ in [11, 12) px stays `unchanged`.
   there is no upscale and the rule is `too-small`.
 - `oversize` means only that the width is above 766 px. `plan` returns
   `oversize` before it looks at the font, so an oversize image with a font below
-  11 px is not flagged by `inspect`. Issue #1 asks to flag it; that flag is
-  deferred to `check`.
-- 2× uses nearest-neighbour and 1.5× uses Lanczos3 (applied by `fit`, M3).
+  11 px is not flagged by `inspect`. Issue #1 asks to flag it; `check` does so
+  on the committed file with the `width` check (the image is wider than the
+  contract allows) and the `min-font-size` check (the font is too small)
+  ([AD-0012](0012-check-gates-the-fitted-file.md)).
+- 2× uses nearest-neighbour and 1.5× uses Lanczos3 (applied by `fit`).
 
 ## Consequences
 

@@ -1,5 +1,9 @@
+pub mod check;
+pub mod checks;
 pub mod cli;
 pub mod contract;
+pub mod fit;
+pub mod fit_cmd;
 pub mod font;
 pub mod inspect;
 pub mod load;

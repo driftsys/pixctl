@@ -2,6 +2,9 @@
 //!
 //! All sizes are in pixels.
 
+/// Version of the display contract. Bump it whenever a contract constant
+/// changes. diagctl mirrors this value.
+pub const CONTRACT_VERSION: u32 = 1;
 /// Width of the display column that images are fitted to.
 pub const COLUMN: u32 = 800;
 /// Smallest estimated font size that is still readable.

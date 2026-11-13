@@ -17,6 +17,6 @@ The factor is 1 for `unchanged`, `too-small` and `oversize`. For `icon`,
 ## Consequences
 
 An `oversize` image is not scaled, so its `output_width` is wider than the 800
-px column. `fit` (M3) must produce exactly this width.
+px column. `fit` produces exactly this width.
 
 Satisfies: [AD-0004](0004-upscale-rule.md)
