@@ -3,7 +3,8 @@
 Scope source: [pixctl#1](https://github.com/driftsys/pixctl/issues/1).
 Implemented in milestone M1. Decisions:
 [AD-0001](../decisions/0001-font-estimate-heuristic.md) to
-[AD-0011](../decisions/0011-k-calibration-rule.md).
+[AD-0011](../decisions/0011-k-calibration-rule.md) and
+[AD-0016](../decisions/0016-json-envelope-and-human-output.md) for the output.
 
 ## Display contract
 
@@ -24,11 +25,15 @@ Implemented in milestone M1. Decisions:
 - `--font-px F` replaces the estimate for every input. `F` is a positive number
   and may be a decimal. The CLI rejects `0`, negative values and non-numbers
   with exit `2`.
-- Without `--json`, `inspect` prints one line per image. With `--json`, it
-  prints an array with one object per image that loaded.
-- An image that fails to load is reported on stderr with its path. The other
-  images are still reported. The exit code is `2` when any image fails or the
-  output cannot be written, and `0` otherwise.
+- Without `--json`, `inspect` prints one line per image, then a summary line
+  `N images: a icon, b unchanged, c upscale, d too-small, e oversize`. The
+  summary line is left out when no image loaded. With `--json`, it prints the
+  envelope in [output.md](output.md), with one result per image that loaded and
+  the summary `{images, icon, unchanged, upscale, too_small, oversize}`.
+- An image that fails to load is reported as a coded error
+  ([output.md](output.md)) and left out of the results. The other images are
+  still reported. The exit code is `2` when any image fails or the output cannot
+  be written, and `0` otherwise.
 - A low confidence is not a failure: `inspect` exits `0` for it.
 
 ## Rules

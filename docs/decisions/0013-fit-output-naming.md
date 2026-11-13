@@ -23,7 +23,10 @@ link or a symbolic link to an input is refused. That comparison uses the
 `same-file` crate and follows the file system, so on a case-sensitive file
 system `Foo.PNG` and `Foo.png` are different files. A symbolic link to a missing
 file is also refused. The error applies to that image only; the other images are
-still processed, and the first writer keeps the file.
+still processed, and the first writer keeps the file. The errors use the codes
+`same_file`, `name_collision` (with the earlier input in `with`) and, for a
+symbolic link to a missing file, `write_failed`
+([AD-0016](0016-json-envelope-and-human-output.md)).
 
 ## Consequences
 

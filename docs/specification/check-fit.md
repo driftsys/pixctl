@@ -6,8 +6,9 @@ and M3 (`fit`, PNG output). Decisions:
 [AD-0002](../decisions/0002-contract-constants.md),
 [AD-0005](../decisions/0005-needs-review-not-failure.md) and
 [AD-0012](../decisions/0012-check-gates-the-fitted-file.md) to
-[AD-0015](../decisions/0015-deterministic-png-encoding.md). The display contract
-and the rules are in [inspect.md](inspect.md).
+[AD-0016](../decisions/0016-json-envelope-and-human-output.md). The display
+contract and the rules are in [inspect.md](inspect.md). The JSON envelope, the
+error codes and the colour rules are in [output.md](output.md).
 
 ## Intent
 
@@ -43,12 +44,18 @@ and gate committed images against the Markdown display contract (`check`).
   `--strict` turns every `REVIEW` into a failure for the exit code only; the
   line still reads `REVIEW`.
 - Without `--json`, `check` prints one line per check:
-  `TAG  [check] path  detail`, with `TAG` one of `PASS`, `FAIL` or `REVIEW`.
-  With `--json`, it prints an array of `{path, check, status, detail}` objects,
-  with the status in lowercase
+  `TAG  [check] path  detail`, with `TAG` one of `PASS`, `FAIL` or `REVIEW`. The
+  text output then ends with a summary line
+  `N images: P passed, F failed, R review`, left out when no image loaded. The
+  `TAG` is coloured as described in [output.md](output.md)
   ([AD-0014](../decisions/0014-check-output-format.md)).
-- An image that fails to load is reported on stderr with its path. The other
-  images are still checked.
+- With `--json`, `check` prints the envelope in [output.md](output.md). A result
+  is `{path, status, checks: [{check, status, detail}]}` for one image, with
+  lowercase statuses. The image status is the worst of its checks, ordered fail,
+  review, pass. Under `--strict` it stays `review`. The summary is
+  `{images, pass, fail, review}`, counted per image.
+- An image that fails to load is reported as a coded error and left out of the
+  results. The other images are still checked.
 - The exit code is `2` when any image fails to load or the output cannot be
   written. Otherwise it is `1` when any check failed, or any check is `REVIEW`
   under `--strict`. Otherwise it is `0`.
@@ -65,17 +72,22 @@ and gate committed images against the Markdown display contract (`check`).
 - Every rule except `icon` adds 16 px of white padding and a 1 px `#d0d7de`
   frame. `oversize` and `too-small` images are written at 1×. `fit` exits `0`
   for them; gating them is the job of `check`.
-- `fit` prints one line per image: `FIT  [rule] path  out-path (W×H)`.
+- Without `--json`, `fit` writes one line per image to stderr:
+  `FIT  [rule] path  out-path (W×H)`. Stdout stays empty. With `--json`, `fit`
+  writes no `FIT` line and prints the envelope in [output.md](output.md). A
+  result is `{path, out, rule, factor, width, height}` for one image written,
+  and the summary is `{written}`.
 - `--font-px F` replaces the estimate. There is no `--format` flag until WebP
   output exists (M4).
 - The output bytes are the same on every run for the same input and the same
   version ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
 - An input that fails to load, an output that would overwrite an input, and an
   output name already written for another input in the same run are errors. Each
-  is reported on stderr with its path, and the other images are still processed
-  ([AD-0013](../decisions/0013-fit-output-naming.md)). The exit code is `2` if
-  any image failed, and `0` otherwise. If the output directory cannot be
-  created, `fit` reports it once, writes no image and exits `2`.
+  is reported as a coded error with its path, and the other images are still
+  processed ([AD-0013](../decisions/0013-fit-output-naming.md)). The exit code
+  is `2` if any image failed, and `0` otherwise. If the output directory cannot
+  be created, `fit` reports one `out_dir_failed` error, writes no image and
+  exits `2`.
 - The output of `fit` passes the `width`, `opaque` and `framed` checks whenever
   the rule is `icon`, `unchanged` or `upscale`.
 
