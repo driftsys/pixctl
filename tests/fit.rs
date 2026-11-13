@@ -2,7 +2,7 @@
 
 use assert_cmd::Command;
 use image::{Rgb, RgbImage, Rgba, RgbaImage};
-use pixctl::checks::{run_all, Status};
+use pixctl::checks::{is_framed, run_all, Status};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -138,26 +138,204 @@ fn refuses_to_overwrite_input() {
     assert_eq!(std::fs::read(&input).unwrap(), before);
 }
 
+/// Runs `fit` on one input into `dir/label`; returns the exit code and stdout.
+fn fit_with(dir: &Path, label: &str, input: &Path, extra: &[&str]) -> (Option<i32>, String) {
+    let out = dir.join(label);
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .args(extra)
+        .arg(input)
+        .output()
+        .unwrap();
+    (res.status.code(), String::from_utf8(res.stdout).unwrap())
+}
+
 #[test]
 fn fit_output_passes_check() {
     let dir = TempDir::new().unwrap();
-    let input = png(dir.path(), "a.png", 300, 200);
-    for (label, extra) in [("unchanged", vec![]), ("upscale", vec!["--font-px", "6"])] {
-        let out = dir.path().join(label);
-        pixctl()
-            .args(["fit", "--out"])
-            .arg(&out)
-            .args(&extra)
-            .arg(&input)
-            .assert()
-            .code(0);
-        let rgba = image::open(out.join("a.png")).unwrap().to_rgba8();
+    let text = png(dir.path(), "a.png", 300, 200);
+    let icon = png(dir.path(), "dot.png", 32, 32);
+    let cases: [(&str, &Path, &[&str], &str, (u32, u32)); 3] = [
+        ("unchanged", &text, &[], "unchanged", (334, 234)),
+        ("upscale", &text, &["--font-px", "6"], "upscale", (634, 434)),
+        ("icon", &icon, &[], "icon", (32, 32)),
+    ];
+    for (label, input, extra, rule, size) in cases {
+        let (code, stdout) = fit_with(dir.path(), label, input, extra);
+        assert_eq!(code, Some(0), "{label}");
+        let name = input.file_name().unwrap().to_str().unwrap();
+        assert!(stdout.starts_with(&format!("FIT  [{rule}] ")), "{stdout}");
+        assert!(
+            stdout
+                .trim_end()
+                .ends_with(&format!("({}×{})", size.0, size.1)),
+            "{stdout}"
+        );
+        let rgba = image::open(dir.path().join(label).join(name))
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(rgba.dimensions(), size, "{label}");
         for o in run_all(&rgba, Some(12.0)) {
-            if ["width", "opaque", "framed"].contains(&o.name) {
-                assert_eq!(o.status, Status::Pass, "{label}: {} {}", o.name, o.detail);
-            }
+            assert_eq!(o.status, Status::Pass, "{label}: {} {}", o.name, o.detail);
         }
     }
+}
+
+#[test]
+fn oversize_and_too_small_exit_0_with_a_border() {
+    let dir = TempDir::new().unwrap();
+    let wide = png(dir.path(), "wide.png", 800, 100);
+    let (code, stdout) = fit_with(dir.path(), "o", &wide, &[]);
+    assert_eq!(code, Some(0));
+    assert!(stdout.starts_with("FIT  [oversize] "), "{stdout}");
+    let rgba = image::open(dir.path().join("o/wide.png"))
+        .unwrap()
+        .to_rgba8();
+    assert_eq!(rgba.dimensions(), (834, 134));
+    assert!(is_framed(&rgba));
+
+    let small = png(dir.path(), "small.png", 300, 200);
+    let (code, stdout) = fit_with(dir.path(), "s", &small, &["--font-px", "5"]);
+    assert_eq!(code, Some(0));
+    assert!(stdout.starts_with("FIT  [too-small] "), "{stdout}");
+    let rgba = image::open(dir.path().join("s/small.png"))
+        .unwrap()
+        .to_rgba8();
+    assert_eq!(rgba.dimensions(), (334, 234));
+    assert!(is_framed(&rgba));
+}
+
+#[test]
+fn colours_survive_fit() {
+    let dir = TempDir::new().unwrap();
+    let input = dir.path().join("c.png");
+    RgbaImage::from_pixel(300, 200, Rgba([200, 100, 50, 255]))
+        .save(&input)
+        .unwrap();
+    fit_with(dir.path(), "o", &input, &[]);
+    let out = image::open(dir.path().join("o/c.png")).unwrap().to_rgb8();
+    assert_eq!(out.get_pixel(100, 100).0, [200, 100, 50]);
+}
+
+#[test]
+fn failing_image_first_does_not_stop_fit() {
+    let dir = TempDir::new().unwrap();
+    let good = png(dir.path(), "good.png", 300, 200);
+    let corrupt = dir.path().join("corrupt.png");
+    std::fs::write(&corrupt, b"not an image").unwrap();
+    let missing = dir.path().join("missing.png");
+    let out = dir.path().join("out");
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&missing)
+        .arg(&corrupt)
+        .arg(&good)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(out.join("good.png").exists());
+    let stderr = String::from_utf8(res.stderr).unwrap();
+    for bad in [&missing, &corrupt] {
+        let name = bad.display().to_string();
+        assert_eq!(stderr.matches(&name).count(), 1, "{stderr}");
+    }
+    assert_eq!(stderr.lines().count(), 2, "{stderr}");
+    assert!(
+        stderr.lines().all(|l| l.starts_with("pixctl: ")),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn output_dir_failure_is_reported_once() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let b = png(dir.path(), "b.png", 300, 200);
+    let blocker = dir.path().join("blocker");
+    std::fs::write(&blocker, b"x").unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(blocker.join("sub"))
+        .arg(&a)
+        .arg(&b)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(res.stdout.is_empty());
+    let stderr = String::from_utf8(res.stderr).unwrap();
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    assert!(stderr.contains("cannot create"), "{stderr}");
+}
+
+/// Input `src/a.png` and an existing output directory `out`.
+fn linked_setup(dir: &Path) -> (PathBuf, PathBuf, Vec<u8>) {
+    let src = dir.join("src");
+    std::fs::create_dir(&src).unwrap();
+    let input = png(&src, "a.png", 300, 200);
+    let out = dir.join("out");
+    std::fs::create_dir(&out).unwrap();
+    let before = std::fs::read(&input).unwrap();
+    (input, out, before)
+}
+
+#[test]
+fn refuses_a_hard_link_to_an_input() {
+    let dir = TempDir::new().unwrap();
+    let (input, out, before) = linked_setup(dir.path());
+    std::fs::hard_link(&input, out.join("a.png")).unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(String::from_utf8(res.stderr)
+        .unwrap()
+        .contains("would overwrite an input"));
+    assert_eq!(std::fs::read(&input).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn refuses_a_symlink_to_an_input() {
+    let dir = TempDir::new().unwrap();
+    let (input, out, before) = linked_setup(dir.path());
+    std::os::unix::fs::symlink(&input, out.join("a.png")).unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(String::from_utf8(res.stderr)
+        .unwrap()
+        .contains("would overwrite an input"));
+    assert_eq!(std::fs::read(&input).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn refuses_a_dangling_symlink_at_the_target() {
+    let dir = TempDir::new().unwrap();
+    let (input, out, before) = linked_setup(dir.path());
+    let missing = dir.path().join("elsewhere.png");
+    std::os::unix::fs::symlink(&missing, out.join("a.png")).unwrap();
+    let res = pixctl()
+        .args(["fit", "--out"])
+        .arg(&out)
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(String::from_utf8(res.stderr)
+        .unwrap()
+        .contains("link to a missing file"));
+    assert!(!missing.exists());
+    assert_eq!(std::fs::read(&input).unwrap(), before);
 }
 
 #[test]

@@ -65,10 +65,16 @@ pub fn encode_png(img: &RgbImage) -> Result<Vec<u8>> {
             ExtendedColorType::Rgb8,
         )
         .context("cannot encode PNG")?;
+    oxipng::optimize_from_memory(&raw, &options()).context("cannot optimise PNG")
+}
+
+/// The oxipng settings: a fixed preset, all metadata chunks stripped and no
+/// interlacing. Changing them changes the bytes of every fitted PNG.
+fn options() -> oxipng::Options {
     let mut opts = oxipng::Options::from_preset(2);
     opts.strip = oxipng::StripChunks::All;
     opts.interlace = Some(false);
-    oxipng::optimize_from_memory(&raw, &opts).context("cannot optimise PNG")
+    opts
 }
 
 #[cfg(test)]
@@ -145,6 +151,77 @@ mod tests {
         let out = render(&img, &rule::plan(32, 32, None));
         let v = out.get_pixel(0, 0).0[0];
         assert!(v == 127 || v == 128, "{v}");
+    }
+
+    #[test]
+    fn oxipng_options_strip_metadata_and_do_not_interlace() {
+        // The encoder never writes metadata chunks, so the output bytes
+        // cannot show these two settings; the options are checked directly.
+        let opts = options();
+        assert!(matches!(opts.strip, oxipng::StripChunks::All));
+        assert_eq!(opts.interlace, Some(false));
+    }
+
+    fn assert_border(out: &RgbImage) {
+        let (w, h) = out.dimensions();
+        for (x, y) in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1), (w / 2, 0)] {
+            assert_eq!(out.get_pixel(x, y).0, FRAME_COLOUR, "({x},{y})");
+        }
+        for (x, y) in [(1, 1), (16, 16), (w - 17, h - 17), (w / 2, 1)] {
+            assert_eq!(out.get_pixel(x, y).0, [255, 255, 255], "({x},{y})");
+        }
+    }
+
+    #[test]
+    fn oversize_gets_the_border() {
+        let img = white(800, 100);
+        let out = render(&img, &rule::plan(800, 100, None));
+        assert_eq!(out.dimensions(), (834, 134));
+        assert_border(&out);
+    }
+
+    #[test]
+    fn too_small_gets_the_border() {
+        let img = white(300, 200);
+        let plan = rule::plan(300, 200, Some(5.0));
+        assert_eq!(plan.rule, Rule::TooSmall);
+        let out = render(&img, &plan);
+        assert_eq!(out.dimensions(), (334, 234));
+        assert_border(&out);
+    }
+
+    #[test]
+    fn colour_channels_keep_their_order() {
+        let mut img = white(300, 200);
+        img.put_pixel(0, 0, Rgba([200, 100, 50, 255]));
+        let out = render(&img, &rule::plan(300, 200, None));
+        assert_eq!(out.get_pixel(17, 17).0, [200, 100, 50]);
+        let out = render(&img, &plan_of(Rule::Upscale, 2.0, 634));
+        assert_eq!(out.get_pixel(18, 18).0, [200, 100, 50]);
+    }
+
+    #[test]
+    fn smoothing_filter_keeps_a_flat_colour() {
+        let img = RgbaImage::from_pixel(300, 200, Rgba([200, 100, 50, 255]));
+        let out = render(&img, &plan_of(Rule::Upscale, 1.5, 484));
+        assert_eq!(out.get_pixel(17 + 100, 17 + 100).0, [200, 100, 50]);
+    }
+
+    #[test]
+    fn alpha_flattens_each_channel_onto_white() {
+        let mut img = white(32, 32);
+        img.put_pixel(0, 0, Rgba([200, 100, 50, 128]));
+        let out = render(&img, &rule::plan(32, 32, None));
+        // c * 128/255 + 255 * 127/255, rounded.
+        assert_eq!(out.get_pixel(0, 0).0, [227, 177, 152]);
+    }
+
+    #[test]
+    fn odd_sizes_at_1_5x_are_rounded() {
+        // 301 x 1.5 = 451.5 -> 452; 201 x 1.5 = 301.5 -> 302.
+        let img = white(301, 201);
+        let out = render(&img, &plan_of(Rule::Upscale, 1.5, 452 + 34));
+        assert_eq!(out.dimensions(), (452 + 34, 302 + 34));
     }
 
     #[test]
