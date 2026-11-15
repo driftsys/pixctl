@@ -627,3 +627,112 @@ fn json_write_failed() {
     assert_eq!(doc["errors"][0]["code"], "write_failed");
     assert_eq!(doc["errors"][0]["file"], input.to_string_lossy().as_ref());
 }
+
+#[test]
+fn webp_output_is_deterministic_and_has_the_png_pixels() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    let (o1, o2, op) = (
+        dir.path().join("o1"),
+        dir.path().join("o2"),
+        dir.path().join("op"),
+    );
+    for o in [&o1, &o2] {
+        pixctl()
+            .args(["fit", "--format", "webp", "--out"])
+            .arg(o)
+            .arg(&input)
+            .assert()
+            .code(0);
+    }
+    pixctl()
+        .args(["fit", "--out"])
+        .arg(&op)
+        .arg(&input)
+        .assert()
+        .code(0);
+    let bytes = std::fs::read(o1.join("a.webp")).unwrap();
+    assert_eq!(bytes, std::fs::read(o2.join("a.webp")).unwrap());
+    let webp = image::open(o1.join("a.webp")).unwrap().to_rgba8();
+    let from_png = image::open(op.join("a.png")).unwrap().to_rgba8();
+    assert_eq!(webp, from_png);
+}
+
+#[test]
+fn webp_output_passes_check() {
+    let dir = TempDir::new().unwrap();
+    let text = png(dir.path(), "a.png", 300, 200);
+    let icon = png(dir.path(), "dot.png", 32, 32);
+    for (label, input) in [("text", &text), ("icon", &icon)] {
+        let (code, _) = fit_with(dir.path(), label, input, &["--format", "webp"]);
+        assert_eq!(code, Some(0), "{label}");
+        let stem = input.file_stem().unwrap().to_str().unwrap();
+        let rgba = image::open(dir.path().join(label).join(format!("{stem}.webp")))
+            .unwrap()
+            .to_rgba8();
+        for o in run_all(&rgba, Some(12.0)) {
+            assert_eq!(o.status, Status::Pass, "{label}: {} {}", o.name, o.detail);
+        }
+    }
+}
+
+#[test]
+fn webp_format_names_the_output_in_the_line_and_the_json() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    let (code, stderr) = fit_with(dir.path(), "t", &input, &["--format", "webp"]);
+    assert_eq!(code, Some(0));
+    let target = dir.path().join("t").join("a.webp");
+    assert!(target.exists());
+    assert!(!dir.path().join("t").join("a.png").exists());
+    assert!(
+        stderr.contains(&format!("{} (334×234)", target.display())),
+        "{stderr}"
+    );
+    let res = pixctl()
+        .args(["fit", "--json", "--format", "webp", "--out"])
+        .arg(dir.path().join("j"))
+        .arg(&input)
+        .output()
+        .unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(
+        doc["results"][0]["out"],
+        dir.path()
+            .join("j")
+            .join("a.webp")
+            .to_string_lossy()
+            .as_ref()
+    );
+}
+
+#[test]
+fn png_and_webp_outputs_of_one_stem_coexist() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    for extra in [&[][..], &["--format", "webp"][..]] {
+        let (code, _) = fit_with(dir.path(), "out", &input, extra);
+        assert_eq!(code, Some(0));
+    }
+    assert!(dir.path().join("out").join("a.png").exists());
+    assert!(dir.path().join("out").join("a.webp").exists());
+}
+
+#[test]
+fn webp_outputs_with_one_stem_collide() {
+    let dir = TempDir::new().unwrap();
+    let a = png(dir.path(), "a.png", 300, 200);
+    let b = dir.path().join("a.jpg");
+    RgbImage::from_pixel(100, 100, Rgb([0, 0, 0]))
+        .save(&b)
+        .unwrap();
+    let res = pixctl()
+        .args(["fit", "--format", "webp", "--out"])
+        .arg(dir.path().join("out"))
+        .arg(&a)
+        .arg(&b)
+        .output()
+        .unwrap();
+    assert_eq!(res.status.code(), Some(2));
+    assert!(String::from_utf8(res.stderr).unwrap().contains("a.webp"));
+}

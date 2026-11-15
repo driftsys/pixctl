@@ -1,5 +1,6 @@
-//! The `fit` command: writes one fitted PNG per input image.
+//! The `fit` command: writes one fitted PNG or WebP per input image.
 
+use crate::cli::Format;
 use crate::font;
 use crate::output::{self, lossy_path, Envelope, Failure};
 use crate::rule::{self, Rule};
@@ -53,6 +54,7 @@ impl FitResult {
 pub fn run(
     images: &[PathBuf],
     out_dir: &Path,
+    format: Format,
     font_px: Option<f32>,
     json: bool,
     out: &mut impl Write,
@@ -74,7 +76,7 @@ pub fn run(
         // Maps each output name to the input that claimed it first.
         let mut written = HashMap::new();
         for path in images {
-            match fit_one(path, images, out_dir, font_px, &mut written) {
+            match fit_one(path, images, out_dir, format, font_px, &mut written) {
                 Ok(result) => {
                     if !json {
                         if let Err(failure) = write_status_line(err, &result, path) {
@@ -141,12 +143,13 @@ fn failure(code: &'static str, path: &Path, reason: String, with: Option<&Path>)
     }
 }
 
-/// Loads one image and writes its fitted PNG. A load error already names the
+/// Loads one image and writes it fitted, in `format`. A load error already names the
 /// path; every other error is prefixed with it.
 fn fit_one(
     path: &Path,
     inputs: &[PathBuf],
     out_dir: &Path,
+    format: Format,
     font_px: Option<f32>,
     written: &mut HashMap<PathBuf, PathBuf>,
 ) -> Result<FitResult, Failure> {
@@ -163,13 +166,17 @@ fn fit_one(
     })?;
     let target = {
         let mut name = stem.to_os_string();
-        name.push(".png");
+        name.push(".");
+        name.push(format.extension());
         out_dir.join(name)
     };
     guard_target(path, &target, out_dir, inputs, written)?;
     let img = fit::render(&loaded.rgba, &plan);
-    let bytes =
-        fit::encode_png(&img).map_err(|e| failure("write_failed", path, format!("{e:#}"), None))?;
+    let encoded = match format {
+        Format::Png => fit::encode_png(&img),
+        Format::Webp => fit::encode_webp(&img),
+    };
+    let bytes = encoded.map_err(|e| failure("write_failed", path, format!("{e:#}"), None))?;
     std::fs::write(&target, bytes).map_err(|e| {
         failure(
             "write_failed",
@@ -318,6 +325,7 @@ mod tests {
         let code = run(
             std::slice::from_ref(&input),
             &dir.path().join("out"),
+            Format::Png,
             None,
             false,
             &mut out,
@@ -361,6 +369,7 @@ mod tests {
         let code = run(
             &[missing, good],
             &dir.path().join("out"),
+            Format::Png,
             None,
             false,
             &mut shared.clone(),
@@ -391,7 +400,15 @@ mod tests {
         // A directory at the target makes the first write fail.
         std::fs::create_dir_all(out_dir.join("a.png")).unwrap();
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let code = run(&inputs, &out_dir, None, true, &mut out, &mut err);
+        let code = run(
+            &inputs,
+            &out_dir,
+            Format::Png,
+            None,
+            true,
+            &mut out,
+            &mut err,
+        );
         assert_eq!(code, 2);
         let doc: serde_json::Value = serde_json::from_slice(&out).unwrap();
         assert_eq!(doc["errors"][0]["code"], "write_failed");
@@ -413,6 +430,7 @@ mod tests {
         let code = run(
             &[input],
             &dir.path().join("out"),
+            Format::Png,
             None,
             true,
             &mut Broken,

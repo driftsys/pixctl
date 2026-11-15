@@ -5,6 +5,7 @@ use crate::contract::{FRAME, FRAME_COLOUR, PADDING};
 use crate::rule::{Plan, Rule};
 use anyhow::{Context, Result};
 use image::codecs::png::{CompressionType, FilterType as PngFilter, PngEncoder};
+use image::codecs::webp::WebPEncoder;
 use image::imageops::{self, FilterType};
 use image::{ExtendedColorType, ImageEncoder, Rgb, RgbImage, RgbaImage};
 
@@ -72,6 +73,22 @@ pub fn encode_png(img: &RgbImage) -> Result<Vec<u8>> {
             ExtendedColorType::Rgb8,
         )
         .context("cannot encode PNG")?;
+    Ok(bytes)
+}
+
+/// Encodes `img` as a lossless WebP. The encoder is pure Rust and writes no
+/// metadata chunk (no EXIF, XMP or ICC profile), so the same image always gives
+/// the same bytes and the static musl build needs no C compiler for it.
+pub fn encode_webp(img: &RgbImage) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    WebPEncoder::new_lossless(&mut bytes)
+        .write_image(
+            img.as_raw(),
+            img.width(),
+            img.height(),
+            ExtendedColorType::Rgb8,
+        )
+        .context("cannot encode WebP")?;
     Ok(bytes)
 }
 
@@ -223,6 +240,22 @@ mod tests {
         let img = white(301, 201);
         let out = render(&img, &plan_of(Rule::Upscale, 1.5, 452 + 34));
         assert_eq!(out.dimensions(), (452 + 34, 302 + 34));
+    }
+
+    #[test]
+    fn webp_encode_is_deterministic_lossless_and_has_no_metadata() {
+        let mut img = RgbImage::from_pixel(40, 30, Rgb([255, 255, 255]));
+        img.put_pixel(5, 5, Rgb([1, 2, 3]));
+        let a = encode_webp(&img).unwrap();
+        let b = encode_webp(&img).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(&a[..4], b"RIFF");
+        assert_eq!(&a[8..12], b"WEBP");
+        let back = image::load_from_memory(&a).unwrap().to_rgb8();
+        assert_eq!(back, img);
+        for chunk in [b"EXIF", b"XMP ", b"ICCP"] {
+            assert!(!a.windows(4).any(|w| w == chunk), "{chunk:?}");
+        }
     }
 
     #[test]
