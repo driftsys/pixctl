@@ -31,10 +31,11 @@ Examples:
         #[arg(long, value_name = "F", value_parser = parse_font_px)]
         font_px: Option<f32>,
     },
-    /// Scale, flatten, pad and frame images as PNG
+    /// Scale, flatten, pad and frame images as PNG or WebP
     #[command(after_help = "\
 Examples:
   pixctl fit screenshot.png --out docs/img
+  pixctl fit screenshot.png --out docs/img --format webp
   pixctl fit raw/*.png --out docs/img --font-px 12
   pixctl fit screenshot.png --out docs/img --json")]
     Fit {
@@ -43,6 +44,9 @@ Examples:
         /// Output directory
         #[arg(long)]
         out: PathBuf,
+        /// Output format (WebP is lossless)
+        #[arg(long, value_enum, default_value_t = Format::Png)]
+        format: Format,
         /// Use this font size in pixels instead of the estimate
         #[arg(long, value_name = "F", value_parser = parse_font_px)]
         font_px: Option<f32>,
@@ -72,6 +76,23 @@ Examples:
         #[arg(long)]
         json: bool,
     },
+}
+
+/// The image format that `fit` writes.
+#[derive(Clone, Copy, ValueEnum)]
+pub enum Format {
+    Png,
+    Webp,
+}
+
+impl Format {
+    /// The file extension of the format, without the dot.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Format::Png => "png",
+            Format::Webp => "webp",
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]

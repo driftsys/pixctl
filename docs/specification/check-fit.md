@@ -2,7 +2,7 @@
 
 Scope source: [pixctl#1](https://github.com/driftsys/pixctl/issues/1).
 Implemented in the first version, which merges the MVP milestones M2 (`check`)
-and M3 (`fit`, PNG output). Decisions:
+and M3 (`fit`, PNG output; WebP output came later). Decisions:
 [AD-0002](../decisions/0002-contract-constants.md),
 [AD-0005](../decisions/0005-needs-review-not-failure.md) and
 [AD-0012](../decisions/0012-check-gates-the-fitted-file.md) to
@@ -12,8 +12,9 @@ error codes and the colour rules are in [output.md](output.md).
 
 ## Intent
 
-A docs author, or CI, can turn a raster image into a display-correct PNG (`fit`)
-and gate committed images against the Markdown display contract (`check`).
+A docs author, or CI, can turn a raster image into a display-correct PNG or WebP
+(`fit`) and gate committed images against the Markdown display contract
+(`check`).
 
 ## Contract version
 
@@ -62,10 +63,10 @@ and gate committed images against the Markdown display contract (`check`).
 
 ## `fit`
 
-`pixctl fit <image>... --out DIR [--font-px F] [--json]`
+`pixctl fit <image>... --out DIR [--format png|webp] [--font-px F] [--json]`
 
-- `fit` writes `<DIR>/<file stem>.png` for each input and creates `DIR` when it
-  is missing.
+- `fit` writes `<DIR>/<file stem>.png` (or `.webp` with `--format webp`) for
+  each input and creates `DIR` when it is missing.
 - `fit` flattens the image onto white. It then applies the rule from
   [inspect.md](inspect.md): `upscale` scales by 2× (nearest neighbour) or 1.5×
   (Lanczos3).
@@ -77,10 +78,14 @@ and gate committed images against the Markdown display contract (`check`).
   writes no `FIT` line and prints the envelope in [output.md](output.md). A
   result is `{path, out, rule, factor, width, height}` for one image written,
   and the summary is `{written}`.
-- `--font-px F` replaces the estimate. There is no `--format` flag until WebP
-  output exists (M4).
+- `--font-px F` replaces the estimate.
+- `--format png|webp` selects the output format, with `png` as the default. The
+  output is `<out>/<file stem>.png` or `<out>/<file stem>.webp`. WebP output is
+  lossless and has no metadata. Only the encoder differs; the rendering is the
+  same.
 - The output bytes are the same on every run for the same input and the same
-  version ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
+  version, for both formats
+  ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
 - An input that fails to load, an output that would overwrite an input, and an
   output name already claimed by another input in the same run are errors. Each
   is reported as a coded error with its path, and the other images are still
@@ -93,8 +98,8 @@ and gate committed images against the Markdown display contract (`check`).
 
 ## Deferred
 
-WebP output, EMF/WMF input, and the public corpus with `just eval` are
-follow-ups and are not built.
+EMF/WMF input, and the public corpus with `just eval` are follow-ups and are not
+built.
 
 ## Alternatives considered
 

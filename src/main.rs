@@ -20,11 +20,13 @@ fn main() {
         Command::Fit {
             images,
             out,
+            format,
             font_px,
             json,
         } => fit_cmd::run(
             &images,
             &out,
+            format,
             font_px,
             json,
             &mut std::io::stdout().lock(),

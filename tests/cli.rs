@@ -36,12 +36,12 @@ fn version_reports_contract() {
 }
 
 #[test]
-fn fit_has_no_format_flag() {
+fn fit_rejects_an_unknown_format() {
     pixctl()
-        .args(["fit", "a.png", "--out", "o", "--format", "png"])
+        .args(["fit", "a.png", "--out", "o", "--format", "gif"])
         .assert()
         .code(2)
-        .stderr(contains("unexpected argument"));
+        .stderr(contains("invalid value 'gif'"));
 }
 
 #[test]
