@@ -91,6 +91,24 @@ jobs:
       - run: just test
       - run: just lint
 
+  # Runs the ignored tests that call a real EMF/WMF converter.
+  converter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup applies rust-toolchain.toml (channel + components).
+      - name: install the pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@${{ env.JUST_VERSION }}
+      - name: install Inkscape
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends inkscape
+      - run: just test-converter
+
   # Compile-verify the static musl release targets on every PR, so a
   # musl-incompatible dependency is caught here instead of at release time.
   # Uses the same cargo-zigbuild cross-compiler as the cargo-dist release build.
