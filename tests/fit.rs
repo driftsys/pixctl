@@ -741,6 +741,7 @@ fn webp_outputs_with_one_stem_collide() {
     let e = &doc["errors"][0];
     assert_eq!(e["code"], "name_collision");
     assert_eq!(e["with"], a.to_string_lossy().as_ref());
+    assert_eq!(e["file"], b.to_string_lossy().as_ref());
     let target = out.join("a.webp");
     assert!(
         e["message"]
@@ -780,10 +781,13 @@ fn fit_json_with(
 fn webp_output_has_riff_webp_magic_bytes() {
     let dir = TempDir::new().unwrap();
     let input = png(dir.path(), "a.png", 300, 200);
-    fit_with(dir.path(), "out", &input, &["--format", "webp"]);
+    let (code, _) = fit_with(dir.path(), "out", &input, &["--format", "webp"]);
+    assert_eq!(code, Some(0));
     let bytes = std::fs::read(dir.path().join("out").join("a.webp")).unwrap();
     assert_eq!(&bytes[..4], b"RIFF");
     assert_eq!(&bytes[8..12], b"WEBP");
+    // `VP8L` is the lossless bitstream; lossy WebP would be `VP8 `.
+    assert_eq!(&bytes[12..16], b"VP8L");
 }
 
 #[test]
@@ -793,9 +797,11 @@ fn explicit_png_format_equals_the_default() {
     fit_with(dir.path(), "default", &input, &[]);
     let (code, _) = fit_with(dir.path(), "explicit", &input, &["--format", "png"]);
     assert_eq!(code, Some(0));
+    let explicit = std::fs::read(dir.path().join("explicit").join("a.png")).unwrap();
+    assert_eq!(&explicit[..8], b"\x89PNG\r\n\x1a\n");
     assert_eq!(
         std::fs::read(dir.path().join("default").join("a.png")).unwrap(),
-        std::fs::read(dir.path().join("explicit").join("a.png")).unwrap()
+        explicit
     );
 }
 
@@ -815,7 +821,7 @@ fn check_command_passes_a_fitted_webp_with_text() {
     assert_eq!(code, Some(0));
     let fitted = dir.path().join("out").join("text.webp");
     let res = pixctl()
-        .args(["check", "--strict", "--font-px", "12"])
+        .args(["check", "--strict"])
         .arg(&fitted)
         .output()
         .unwrap();
