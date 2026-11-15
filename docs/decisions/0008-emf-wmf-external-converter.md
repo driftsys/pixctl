@@ -25,6 +25,13 @@ files are still processed (exit `2`). A converter that exits non-zero, times out
 `convert_failed`. On Unix a timeout kills the converter's process group with the
 `kill` utility.
 
+The two converters, and their versions, render one file differently, so the
+result of a converted file depends on the machine. `inspect` reports the
+converter program so that a difference can be traced. The documented workflow
+converts each file once with `fit` and commits the PNG, and CI pins the program
+with `PIXCTL_CONVERTER`. Making the converters give equal results was rejected:
+only one converter would allow that, and the fallback would no longer exist.
+
 WebP output was never deferred: `fit --format webp` writes a lossless WebP with
 the `image` crate, which needs no C code.
 

@@ -84,6 +84,46 @@ fn inspect_uses_the_inkscape_converter() {
         (r["width"].as_u64(), r["height"].as_u64()),
         (Some(40), Some(30))
     );
+    assert_eq!(r["converter"], "fake-inkscape");
+}
+
+#[test]
+fn inspect_names_the_converter_in_the_plain_line() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_inkscape(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let line = String::from_utf8(out).unwrap();
+    assert!(
+        line.lines()
+            .next()
+            .unwrap()
+            .ends_with("  via=fake-inkscape"),
+        "{line}"
+    );
+}
+
+#[test]
+fn inspect_omits_the_converter_for_a_png() {
+    let d = TempDir::new().unwrap();
+    let input = fixture(d.path());
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(json(&out)["results"][0].get("converter").is_none());
 }
 
 #[test]

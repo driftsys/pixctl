@@ -228,13 +228,27 @@ Two errors apply (see [Error codes](#error-codes)):
   writing a PNG that can be decoded, the file gets `convert_failed`. The message
   names the converter and says what happened.
 
+`inspect` names the converter it used: the JSON report has a `converter` field
+with the file name of the program (for example `inkscape`), and the plain line
+ends with `via=<name>`. The field is absent for other formats.
+
+The result depends on the converter. Inkscape and LibreOffice, and different
+versions of each, can render one file at different sizes and with different
+text, so the width, the font estimate and the check result can differ between
+machines. To get results that do not depend on the machine:
+
+- Convert each EMF or WMF file once with `pixctl fit`, commit the PNG, and
+  reference and `check` the PNG, not the original file.
+- When CI must read EMF or WMF files, set `PIXCTL_CONVERTER=inkscape` so that
+  the same program is used every time and LibreOffice is never chosen instead.
+
 The examples use Inkscape, found on `PATH`. The output was produced with a
 script that stands in for Inkscape and returns a 300x200 white PNG, because no
 converter was installed on the machine that wrote this page.
 
 ```console
 $ pixctl inspect diagram.wmf
-diagram.wmf  300x200  alpha=false  font=?px (low)  rule=unchanged x1 -> 334px
+diagram.wmf  300x200  alpha=false  font=?px (low)  rule=unchanged x1 -> 334px  via=inkscape
 1 image: 0 icon, 1 unchanged, 0 upscale, 0 too-small, 0 oversize
 $ pixctl fit diagram.wmf --out o
 FIT  [unchanged] diagram.wmf  o/diagram.png (334×234)

@@ -24,8 +24,8 @@ parses the arguments, calls the commands. `check` and `fit` are in
 - `contract`: `CONTRACT_VERSION = 1`, `COLUMN = 800`, `MIN_FONT_PX = 11`,
   `TARGET_FONT_PX = 12`, `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`,
   `ICON_MAX = 64`, `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
-- `load::load(path) -> Result<Loaded { rgba, has_alpha }, Failure>`. Paths
-  ending in `.emf`/`.wmf` (any case) are converted to PNG through
+- `load::load(path) -> Result<Loaded { rgba, has_alpha, converter }, Failure>`.
+  Paths ending in `.emf`/`.wmf` (any case) are converted to PNG through
   `convert::find_in` and `convert::to_png` (`unsupported_type` when no converter
   is found, `convert_failed` when it fails); a file that cannot be opened or
   decoded gives `read_failed`. Errors carry the path ([output.md](output.md)).

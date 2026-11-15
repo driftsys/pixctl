@@ -36,6 +36,9 @@ pub struct Report {
     pub rule: Rule,
     pub factor: f32,
     pub output_width: u32,
+    /// The converter program for an EMF/WMF input; absent for other formats.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converter: Option<String>,
 }
 
 /// The totals of an `inspect` run. `images` counts the reports, not the inputs.
@@ -167,6 +170,7 @@ fn inspect(path: &Path, font_px: Option<f32>) -> Result<Report, Failure> {
         rule: plan.rule,
         factor: plan.factor,
         output_width: plan.output_width,
+        converter: loaded.converter,
     })
 }
 
@@ -183,8 +187,12 @@ fn plain_line(r: &Report) -> String {
         .ok()
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default();
+    let via = match &r.converter {
+        Some(name) => format!("  via={name}"),
+        None => String::new(),
+    };
     format!(
-        "{}  {}x{}  alpha={}  font={} ({})  rule={} x{} -> {}px",
+        "{}  {}x{}  alpha={}  font={} ({})  rule={} x{} -> {}px{}",
         r.path.display(),
         r.width,
         r.height,
@@ -193,7 +201,8 @@ fn plain_line(r: &Report) -> String {
         confidence,
         rule,
         r.factor,
-        r.output_width
+        r.output_width,
+        via
     )
 }
 
@@ -240,6 +249,7 @@ mod tests {
             rule: Rule::Icon,
             factor: 1.0,
             output_width: 1,
+            converter: None,
         };
         let json = serde_json::to_string(&[report]).expect("serialises");
         assert!(json.contains("\"bad\u{FFFD}.png\""), "{json}");

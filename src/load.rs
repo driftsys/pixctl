@@ -11,6 +11,8 @@ pub struct Loaded {
     pub rgba: RgbaImage,
     /// True when at least one pixel has alpha below 255.
     pub has_alpha: bool,
+    /// The file name of the converter program for an EMF/WMF input.
+    pub converter: Option<String>,
 }
 
 /// Decode the image at `path` to RGBA8.
@@ -26,6 +28,7 @@ pub fn load(path: &Path) -> Result<Loaded, Failure> {
     let ext = path
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
+    let mut converter = None;
     let rgba = if matches!(ext.as_deref(), Some("emf" | "wmf")) {
         let explicit = std::env::var_os("PIXCTL_CONVERTER");
         let path_var = std::env::var_os("PATH");
@@ -46,7 +49,12 @@ pub fn load(path: &Path) -> Result<Loaded, Failure> {
             })?;
         let limit =
             convert::parse_timeout(std::env::var("PIXCTL_CONVERT_TIMEOUT_SECS").ok().as_deref());
-        convert::to_png(&conv, path, limit)?.to_rgba8()
+        let rgba = convert::to_png(&conv, path, limit)?.to_rgba8();
+        converter = conv
+            .program
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned());
+        rgba
     } else {
         image::open(path)
             .map_err(|e| Failure {
@@ -59,7 +67,11 @@ pub fn load(path: &Path) -> Result<Loaded, Failure> {
             .to_rgba8()
     };
     let has_alpha = rgba.pixels().any(|p| p.0[3] < 255);
-    Ok(Loaded { rgba, has_alpha })
+    Ok(Loaded {
+        rgba,
+        has_alpha,
+        converter,
+    })
 }
 
 /// Composites RGBA onto white, then converts to Rec. 601 luma.
