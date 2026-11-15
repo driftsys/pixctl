@@ -338,3 +338,32 @@ fn a_grandchild_process_is_killed_with_the_group() {
     std::thread::sleep(std::time::Duration::from_secs(4));
     assert!(!marker.exists());
 }
+
+/// Runs the real Inkscape from `PATH` on `fixtures/rect.wmf`. It is ignored by
+/// default; `just test-converter` runs it, and the `converter` CI job installs
+/// Inkscape first.
+///
+/// `fixtures/rect.wmf` (110 bytes) was built by hand from the WMF
+/// specification (MS-WMF): a 22-byte placeable header (bounding box 200x100 at
+/// 96 units per inch), the 18-byte metafile header, then the records
+/// SetMapMode, SetWindowOrg, SetWindowExt, CreateBrushIndirect, SelectObject,
+/// Rectangle and EOF.
+#[test]
+#[ignore = "needs Inkscape on PATH; run with `just test-converter`"]
+fn converter_real_inkscape_converts_a_wmf() {
+    let input = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rect.wmf");
+    let mut c = Command::cargo_bin("pixctl").unwrap();
+    let out = c
+        .env_remove("PIXCTL_CONVERTER")
+        .env_remove("PIXCTL_CONVERT_TIMEOUT_SECS")
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let r = &json(&out)["results"][0];
+    assert!(r["width"].as_u64().unwrap() > 0);
+    assert!(r["height"].as_u64().unwrap() > 0);
+}

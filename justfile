@@ -36,6 +36,10 @@ compile:
 test:
     cargo test --all --locked
 
+# Run the tests that need a real EMF/WMF converter (Inkscape on PATH).
+test-converter:
+    cargo test --locked -- --ignored converter
+
 # Lint the install scripts.
 shellcheck:
     shellcheck -x install.sh bootstrap .githooks/pre-push-gate.sh tests/install/install_test.sh
