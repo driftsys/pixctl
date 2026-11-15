@@ -6,6 +6,8 @@ use pixctl::checks::{is_framed, run_all, Status};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
+mod support;
+
 fn pixctl() -> Command {
     Command::cargo_bin("pixctl").unwrap()
 }
@@ -726,13 +728,100 @@ fn webp_outputs_with_one_stem_collide() {
     RgbImage::from_pixel(100, 100, Rgb([0, 0, 0]))
         .save(&b)
         .unwrap();
-    let res = pixctl()
+    let (alone, out) = (dir.path().join("alone"), dir.path().join("out"));
+    pixctl()
         .args(["fit", "--format", "webp", "--out"])
-        .arg(dir.path().join("out"))
+        .arg(&alone)
         .arg(&a)
-        .arg(&b)
+        .assert()
+        .code(0);
+    let (code, doc, _) = fit_json_with(&["--format", "webp"], &[&a, &b], &out);
+    assert_eq!(code, Some(2));
+    assert_eq!(doc["errors"].as_array().unwrap().len(), 1);
+    let e = &doc["errors"][0];
+    assert_eq!(e["code"], "name_collision");
+    assert_eq!(e["with"], a.to_string_lossy().as_ref());
+    let target = out.join("a.webp");
+    assert!(
+        e["message"]
+            .as_str()
+            .unwrap()
+            .contains(target.to_string_lossy().as_ref()),
+        "{e}"
+    );
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        std::fs::read(alone.join("a.webp")).unwrap()
+    );
+}
+
+/// Like `fit_json`, with extra options before the inputs.
+fn fit_json_with(
+    extra: &[&str],
+    inputs: &[&Path],
+    out: &Path,
+) -> (Option<i32>, serde_json::Value, String) {
+    let res = pixctl()
+        .args(["fit", "--json", "--out"])
+        .arg(out)
+        .args(extra)
+        .args(inputs)
         .output()
         .unwrap();
-    assert_eq!(res.status.code(), Some(2));
-    assert!(String::from_utf8(res.stderr).unwrap().contains("a.webp"));
+    let doc = serde_json::from_slice(&res.stdout).expect("stdout is one JSON document");
+    (
+        res.status.code(),
+        doc,
+        String::from_utf8(res.stderr).unwrap(),
+    )
+}
+
+#[test]
+fn webp_output_has_riff_webp_magic_bytes() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    fit_with(dir.path(), "out", &input, &["--format", "webp"]);
+    let bytes = std::fs::read(dir.path().join("out").join("a.webp")).unwrap();
+    assert_eq!(&bytes[..4], b"RIFF");
+    assert_eq!(&bytes[8..12], b"WEBP");
+}
+
+#[test]
+fn explicit_png_format_equals_the_default() {
+    let dir = TempDir::new().unwrap();
+    let input = png(dir.path(), "a.png", 300, 200);
+    fit_with(dir.path(), "default", &input, &[]);
+    let (code, _) = fit_with(dir.path(), "explicit", &input, &["--format", "png"]);
+    assert_eq!(code, Some(0));
+    assert_eq!(
+        std::fs::read(dir.path().join("default").join("a.png")).unwrap(),
+        std::fs::read(dir.path().join("explicit").join("a.png")).unwrap()
+    );
+}
+
+#[test]
+fn check_command_passes_a_fitted_webp_with_text() {
+    let dir = TempDir::new().unwrap();
+    let input = dir.path().join("text.png");
+    support::render_text(&support::TextSpec {
+        face: support::Face::DejaVu,
+        em_px: 14.0,
+        lines: 6,
+        invert: false,
+    })
+    .save(&input)
+    .unwrap();
+    let (code, _) = fit_with(dir.path(), "out", &input, &["--format", "webp"]);
+    assert_eq!(code, Some(0));
+    let fitted = dir.path().join("out").join("text.webp");
+    let res = pixctl()
+        .args(["check", "--strict", "--font-px", "12"])
+        .arg(&fitted)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(res.stdout).unwrap();
+    assert_eq!(res.status.code(), Some(0), "{stdout}");
+    for name in ["width", "min-font-size", "opaque", "framed"] {
+        assert!(stdout.contains(&format!("PASS  [{name}]")), "{stdout}");
+    }
 }
