@@ -38,7 +38,9 @@ input. Without a converter, the behaviour stays as it is now.
   - LibreOffice: `soffice --headless --convert-to png --outdir <tmp> <in>`. The
     output is `<tmp>/<stem>.png`.
 - Time limit: 60 s per file. When the limit passes, pixctl kills the converter
-  and reports `convert_failed`.
+  and reports `convert_failed`. On Unix the converter runs in its own process
+  group and the whole group is killed with the `kill` utility (no `libc`
+  dependency). Without `kill`, a grandchild process can outlive the limit.
 - Errors:
   - No converter found: `unsupported_type`, with the hint
     `install Inkscape or LibreOffice, or set PIXCTL_CONVERTER`.

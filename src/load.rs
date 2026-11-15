@@ -27,7 +27,7 @@ pub fn load(path: &Path) -> Result<Loaded, Failure> {
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
     let rgba = if matches!(ext.as_deref(), Some("emf" | "wmf")) {
-        let explicit = std::env::var("PIXCTL_CONVERTER").ok();
+        let explicit = std::env::var_os("PIXCTL_CONVERTER");
         let path_var = std::env::var_os("PATH");
         let conv = convert::find_in(explicit.as_deref(), path_var.as_deref())
             .map_err(|mut f| {

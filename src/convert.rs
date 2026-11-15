@@ -1,5 +1,11 @@
 //! Converts EMF and WMF files to PNG through an installed Inkscape or
 //! LibreOffice.
+//!
+//! On Unix, the converter runs in its own process group, and a timeout kills
+//! the whole group with the `kill` utility (no `libc` dependency). If `kill` is
+//! not installed, only the converter process itself is killed, and a child
+//! process that it started can outlive the timeout. On other platforms only
+//! the converter process is killed.
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -70,6 +76,9 @@ fn is_executable(path: &Path) -> bool {
 
 fn on_path(name: &str, path_var: &OsStr) -> Option<PathBuf> {
     std::env::split_paths(path_var).find_map(|dir| {
+        if dir.as_os_str().is_empty() {
+            return None;
+        }
         let plain = dir.join(name);
         if is_executable(&plain) {
             return Some(plain);
@@ -86,11 +95,12 @@ fn on_path(name: &str, path_var: &OsStr) -> Option<PathBuf> {
 /// `libreoffice` are looked up on `path_var`, in that order. `Ok(None)` means
 /// that no converter is installed.
 pub fn find_in(
-    explicit: Option<&str>,
+    explicit: Option<&OsStr>,
     path_var: Option<&OsStr>,
 ) -> Result<Option<Converter>, Failure> {
     if let Some(value) = explicit.filter(|v| !v.is_empty()) {
         let program = PathBuf::from(value);
+        let value = value.to_string_lossy();
         return match kind_of(&program) {
             Some(kind) => Ok(Some(Converter { kind, program })),
             None => Err(Failure {
@@ -127,6 +137,24 @@ pub fn parse_timeout(value: Option<&str>) -> Duration {
     Duration::from_secs(secs)
 }
 
+/// Kills the converter and, on Unix, its process group, then reaps it.
+fn kill_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    for kill in ["/bin/kill", "/usr/bin/kill"] {
+        let status = Command::new(kill)
+            .args(["-KILL", "--"])
+            .arg(format!("-{}", child.id()))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if status.is_ok_and(|s| s.success()) {
+            break;
+        }
+    }
+    let _ = child.kill();
+}
+
 /// Converts `input` to a PNG in a temporary directory and decodes it.
 ///
 /// The converter is killed when it runs longer than `limit`. The temporary
@@ -148,21 +176,33 @@ pub fn to_png(
         .tempdir()
         .map_err(|e| fail(format!("cannot create a temporary directory: {e}")))?;
 
+    // A relative path that starts with `-` would be read as an option.
+    let input = if input.is_absolute() {
+        input.to_path_buf()
+    } else {
+        Path::new(".").join(input)
+    };
     let mut cmd = Command::new(&conv.program);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
     let produced = match conv.kind {
         Kind::Inkscape => {
             let out = tmp.path().join("out.png");
             let mut export = std::ffi::OsString::from("--export-filename=");
             export.push(&out);
-            cmd.arg(input).arg("--export-type=png").arg(export);
+            cmd.arg(&input).arg("--export-type=png").arg(export);
             out
         }
         Kind::LibreOffice => {
-            let stem = input.file_stem().unwrap_or_default();
+            let mut name = input.file_stem().unwrap_or_default().to_os_string();
+            name.push(".png");
             cmd.args(["--headless", "--convert-to", "png", "--outdir"])
                 .arg(tmp.path())
-                .arg(input);
-            tmp.path().join(Path::new(stem).with_extension("png"))
+                .arg(&input);
+            tmp.path().join(name)
         }
     };
     cmd.stdin(Stdio::null())
@@ -178,13 +218,13 @@ pub fn to_png(
             Ok(Some(status)) => break status,
             Ok(None) => {}
             Err(e) => {
-                let _ = child.kill();
+                kill_tree(&mut child);
                 let _ = child.wait();
                 return Err(fail(format!("cannot wait for the converter: {e}")));
             }
         }
         if start.elapsed() >= limit {
-            let _ = child.kill();
+            kill_tree(&mut child);
             let _ = child.wait();
             return Err(fail(format!(
                 "timed out after {} s and was killed",
@@ -216,12 +256,14 @@ mod tests {
 
     #[test]
     fn explicit_value_picks_each_kind() {
-        let c = find_in(Some("/x/my-Inkscape"), None).unwrap().unwrap();
+        let c = find_in(Some(OsStr::new("/x/my-Inkscape")), None)
+            .unwrap()
+            .unwrap();
         assert_eq!(c.kind, Kind::Inkscape);
         assert_eq!(c.program, PathBuf::from("/x/my-Inkscape"));
         for n in ["soffice", "/o/libreoffice7"] {
             assert_eq!(
-                find_in(Some(n), None).unwrap().unwrap().kind,
+                find_in(Some(OsStr::new(n)), None).unwrap().unwrap().kind,
                 Kind::LibreOffice
             );
         }
@@ -229,7 +271,7 @@ mod tests {
 
     #[test]
     fn unknown_explicit_name_is_convert_failed_with_hint() {
-        let f = find_in(Some("gimp"), None).unwrap_err();
+        let f = find_in(Some(OsStr::new("gimp")), None).unwrap_err();
         assert_eq!(f.code, "convert_failed");
         assert!(f.hint.unwrap().contains("Inkscape"));
     }
@@ -238,7 +280,7 @@ mod tests {
     fn empty_explicit_value_falls_back_to_path() {
         let d = tempfile::tempdir().unwrap();
         stub(d.path(), "soffice");
-        let c = find_in(Some(""), Some(d.path().as_os_str()))
+        let c = find_in(Some(OsStr::new("")), Some(d.path().as_os_str()))
             .unwrap()
             .unwrap();
         assert_eq!(c.kind, Kind::LibreOffice);
@@ -261,6 +303,16 @@ mod tests {
             (c.kind, c.program),
             (Kind::Inkscape, d.path().join("inkscape"))
         );
+    }
+
+    #[test]
+    fn empty_path_entries_are_skipped() {
+        // An empty entry means the current directory in a lookup; skip it.
+        let name = format!("pixctl-empty-entry-{}", std::process::id());
+        stub(Path::new("."), &name);
+        let found = on_path(&name, OsStr::new(":"));
+        std::fs::remove_file(&name).unwrap();
+        assert_eq!(found, None);
     }
 
     #[test]

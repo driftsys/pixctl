@@ -262,3 +262,79 @@ fn the_temporary_directory_is_removed_on_success_and_failure() {
         assert!(left.is_empty(), "{left:?}");
     }
 }
+
+#[test]
+fn a_stem_with_a_dot_is_converted_by_soffice() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_soffice(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.b.emf");
+    pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .success();
+}
+
+#[test]
+fn a_relative_input_starting_with_a_dash_is_passed_with_a_prefix() {
+    let d = TempDir::new().unwrap();
+    let args = d.path().join("args.txt");
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!("printf '%s\\n' \"$@\" > '{}'\nexit 1", args.display()),
+    );
+    emf(d.path(), "-x.emf");
+    pixctl()
+        .current_dir(d.path())
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg("--")
+        .arg("-x.emf")
+        .assert()
+        .code(2);
+    let recorded = std::fs::read_to_string(&args).unwrap();
+    assert_eq!(recorded.lines().next(), Some("./-x.emf"), "{recorded}");
+}
+
+#[test]
+fn the_temporary_directory_is_removed_after_a_timeout() {
+    let d = TempDir::new().unwrap();
+    let tmpdir = d.path().join("tmp");
+    std::fs::create_dir(&tmpdir).unwrap();
+    let conv = script(d.path(), "fake-inkscape", "sleep 30");
+    let input = emf(d.path(), "a.emf");
+    pixctl()
+        .env("TMPDIR", &tmpdir)
+        .env("PIXCTL_CONVERTER", &conv)
+        .env("PIXCTL_CONVERT_TIMEOUT_SECS", "1")
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .code(2);
+    let left: Vec<_> = std::fs::read_dir(&tmpdir).unwrap().collect();
+    assert!(left.is_empty(), "{left:?}");
+}
+
+#[test]
+fn a_grandchild_process_is_killed_with_the_group() {
+    let d = TempDir::new().unwrap();
+    let marker = d.path().join("alive");
+    // The grandchild writes the marker after 3 s, unless it is killed first.
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!("(sleep 3; touch '{}') &\nsleep 30", marker.display()),
+    );
+    let input = emf(d.path(), "a.emf");
+    pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .env("PIXCTL_CONVERT_TIMEOUT_SECS", "1")
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .code(2);
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    assert!(!marker.exists());
+}
