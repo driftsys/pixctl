@@ -2,6 +2,7 @@ pub mod check;
 pub mod checks;
 pub mod cli;
 pub mod contract;
+pub mod convert;
 pub mod fit;
 pub mod fit_cmd;
 pub mod font;
