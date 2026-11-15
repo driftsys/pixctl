@@ -77,8 +77,11 @@ and gate committed images against the Markdown display contract (`check`).
   writes no `FIT` line and prints the envelope in [output.md](output.md). A
   result is `{path, out, rule, factor, width, height}` for one image written,
   and the summary is `{written}`.
-- `--font-px F` replaces the estimate. There is no `--format` flag until WebP
-  output exists (M4).
+- `--font-px F` replaces the estimate.
+- `--format png|webp` selects the output format, with `png` as the default. The
+  output is `<out>/<file stem>.png` or `<out>/<file stem>.webp`. WebP output is
+  lossless and has no metadata. Only the encoder differs; the rendering is the
+  same.
 - The output bytes are the same on every run for the same input and the same
   version ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
 - An input that fails to load, an output that would overwrite an input, and an
@@ -93,8 +96,8 @@ and gate committed images against the Markdown display contract (`check`).
 
 ## Deferred
 
-WebP output, EMF/WMF input, and the public corpus with `just eval` are
-follow-ups and are not built.
+EMF/WMF input, and the public corpus with `just eval` are follow-ups and are not
+built.
 
 ## Alternatives considered
 

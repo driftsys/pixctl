@@ -28,8 +28,9 @@ with the code it returns).
   `framed`) on one decoded image.
 - `check.rs` — the `check` command: runs the checks and prints PASS, FAIL and
   REVIEW lines or JSON.
-- `fit.rs` — renders an image to the display contract and encodes the PNG.
-- `fit_cmd.rs` — the `fit` command: writes one fitted PNG per input.
+- `fit.rs` — renders an image to the display contract and encodes the PNG or
+  WebP.
+- `fit_cmd.rs` — the `fit` command: writes one fitted PNG or WebP per input.
 - `main.rs` — thin glue: parses the arguments and calls the commands.
 
 ## Build commands

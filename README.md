@@ -316,12 +316,12 @@ pixctl: cannot decode image missing.png: No such file or directory (os error 2)
 ### fit
 
 ```sh
-pixctl fit <image>... --out <dir> [--font-px F] [--json]
+pixctl fit <image>... --out <dir> [--format png|webp] [--font-px F] [--json]
 ```
 
-`fit` writes one PNG per input image to the `--out` directory. The output is
-named `<file stem>.png`. `fit` creates the directory when it is missing. For
-each image, it:
+`fit` writes one image per input image to the `--out` directory. The output is
+named `<file stem>.<ext>`, where the extension is `png` (the default) or `webp`.
+`fit` creates the directory when it is missing. For each image, it:
 
 1. flattens transparent pixels onto white;
 2. scales the image by the factor of the fit rule: `upscale` multiplies the size
@@ -329,6 +329,21 @@ each image, it:
    size;
 3. adds 16 px of white padding and a 1 px `#d0d7de` frame, except for `icon`
    images, which stay unframed.
+
+`--format webp` writes a lossless WebP instead of a PNG. The pixels are the same
+as in the PNG output, and the file has no metadata. The bytes are the same on
+every run. `check` accepts the WebP output:
+
+```console
+$ pixctl fit blank.png --out fitted --format webp
+FIT  [unchanged] blank.png  fitted/blank.webp (334×234)
+$ pixctl check fitted/blank.webp
+PASS  [width] fitted/blank.webp  334 px <= 800 px
+REVIEW  [min-font-size] fitted/blank.webp  font size estimate has low confidence
+PASS  [opaque] fitted/blank.webp  no transparent pixel
+PASS  [framed] fitted/blank.webp  frame and padding present
+1 image: 0 passed, 0 failed, 1 review
+```
 
 The rule is the one that `inspect` reports. `--font-px F` replaces the font
 estimate, as in `inspect`. `oversize` and `too-small` images are written at
