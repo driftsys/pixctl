@@ -13,6 +13,7 @@ parses the arguments, calls the commands. `check` and `fit` are in
 | [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                |
 | [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md)) |
 | [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`     |
+| [`convert.rs`](../../src/convert.rs)   | finds Inkscape or LibreOffice and converts EMF/WMF to PNG with a time limit                 |
 | [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                 |
 | [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                             |
 | [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                  |
@@ -24,9 +25,10 @@ parses the arguments, calls the commands. `check` and `fit` are in
   `TARGET_FONT_PX = 12`, `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`,
   `ICON_MAX = 64`, `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
 - `load::load(path) -> Result<Loaded { rgba, has_alpha }, Failure>`. Paths
-  ending in `.emf`/`.wmf` (any case) give `unsupported_type`; a file that cannot
-  be opened or decoded gives `read_failed`. Errors carry the path
-  ([output.md](output.md)).
+  ending in `.emf`/`.wmf` (any case) are converted to PNG through
+  `convert::find_in` and `convert::to_png` (`unsupported_type` when no converter
+  is found, `convert_failed` when it fails); a file that cannot be opened or
+  decoded gives `read_failed`. Errors carry the path ([output.md](output.md)).
 - `load::flatten_to_gray(&RgbaImage) -> GrayImage` composites onto white and
   converts to greyscale.
 - `font::estimate` returns `px: Option<f32>`, `confidence: High | Low`, and the

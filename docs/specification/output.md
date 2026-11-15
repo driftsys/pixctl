@@ -33,7 +33,8 @@ from one JSON document. A person gets a short text output.
 | Code               | Meaning                                                      |
 | ------------------ | ------------------------------------------------------------ |
 | `read_failed`      | The file cannot be opened or decoded, or has no file stem.   |
-| `unsupported_type` | The file is EMF or WMF.                                      |
+| `unsupported_type` | The file is EMF or WMF and no converter is found.            |
+| `convert_failed`   | The EMF/WMF converter failed, timed out or wrote no PNG.     |
 | `out_dir_failed`   | `fit` cannot create the `--out` directory.                   |
 | `same_file`        | The `fit` output would overwrite an input.                   |
 | `name_collision`   | Two inputs map to one output name; `with` is the earlier one |

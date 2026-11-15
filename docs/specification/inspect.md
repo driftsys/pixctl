@@ -21,7 +21,8 @@ Implemented in milestone M1. Decisions:
   transparent (alpha < 255), the font estimate with its confidence, the rule,
   the scale factor and the output width.
 - Supported input formats are PNG, JPEG, BMP, GIF, TIFF and WebP. EMF and WMF
-  files are reported as unsupported.
+  files are converted to PNG with an external converter
+  ([AD-0008](../decisions/0008-emf-wmf-external-converter.md)).
 - `--font-px F` replaces the estimate for every input. `F` is a positive number
   and may be a decimal. The CLI rejects `0`, negative values and non-numbers
   with exit `2`.
