@@ -12,6 +12,11 @@ static musl binary built with `cargo zigbuild`.
   compiles the C library libdeflate, whose AVX-512 code does not compile under
   `zig cc`, so the static musl release build fails.
 - Encode with the pure Rust PNG encoder of `image`, with fixed settings.
+- WebP with the `webp` crate (libwebp bindings). Rejected: it is C code, which
+  breaks the static musl release build.
+- Lossy WebP. Rejected: lossy compression blurs text, which the display contract
+  needs to stay readable.
+- Lossless WebP with the pure Rust encoder of `image-webp` (through `image`).
 
 ## Decision
 
@@ -23,7 +28,9 @@ metadata chunks and no interlacing. No C library is involved.
 `image::codecs::webp::WebPEncoder::new_lossless`, which is the lossless pure
 Rust encoder of `image-webp`. It writes no metadata chunks (no EXIF, XMP or ICC
 profile). The `image-webp` version is pinned through `Cargo.lock`, so the same
-image and the same pixctl version give the same bytes.
+image and the same pixctl version give the same bytes in builds that use the
+shipped `Cargo.lock` (the release binaries and `cargo install --locked`). A
+build that resolves a newer `image-webp` can produce different bytes.
 
 ## Consequences
 
