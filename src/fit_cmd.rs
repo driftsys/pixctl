@@ -143,8 +143,8 @@ fn failure(code: &'static str, path: &Path, reason: String, with: Option<&Path>)
     }
 }
 
-/// Loads one image and writes it fitted, in `format`. A load error already names the
-/// path; every other error is prefixed with it.
+/// Loads one image and writes it fitted, in `format`. A load error already
+/// names the path; every other error is prefixed with it.
 fn fit_one(
     path: &Path,
     inputs: &[PathBuf],

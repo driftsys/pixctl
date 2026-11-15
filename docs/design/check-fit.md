@@ -14,7 +14,7 @@ returns the exit code. The shared types are in [output.md](output.md).
 | -------------------------------------- | ------------------------------------------------------------------- |
 | [`checks.rs`](../../src/checks.rs)     | pure checks on one RGBA image                                       |
 | [`check.rs`](../../src/check.rs)       | the `check` command: loads, runs the checks, prints lines or JSON   |
-| [`fit.rs`](../../src/fit.rs)           | pure `render` and `encode_png`                                      |
+| [`fit.rs`](../../src/fit.rs)           | pure `render`, `encode_png` and `encode_webp`                       |
 | [`fit_cmd.rs`](../../src/fit_cmd.rs)   | the `fit` command: names, collision guards, writes files            |
 | [`contract.rs`](../../src/contract.rs) | adds `CONTRACT_VERSION = 1`                                         |
 | [`cli.rs`](../../src/cli.rs)           | `check` and `fit` flags; the version string carries the contract    |
@@ -35,9 +35,10 @@ the number in the version string to `CONTRACT_VERSION`.
 - `fit::render(rgba, plan) -> RgbImage`: flatten onto white, scale, then pad and
   frame unless the rule is `icon`. Factor 2.0 uses nearest neighbour; any other
   factor uses Lanczos3. The target size is `round(w × f)` by `round(h × f)`.
-- `fit::encode_png(img) -> Result<Vec<u8>>`
+- `fit::encode_png(img) -> Result<Vec<u8>>` and
+  `fit::encode_webp(img) -> Result<Vec<u8>>`
   ([AD-0015](../decisions/0015-deterministic-png-encoding.md)).
-- `fit_cmd::run(images, out_dir, font_px, json, out, err) -> i32`.
+- `fit_cmd::run(images, out_dir, format, font_px, json, out, err) -> i32`.
 
 ## `check` flow
 

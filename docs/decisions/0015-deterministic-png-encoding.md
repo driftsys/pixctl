@@ -1,4 +1,4 @@
-# AD-0015 Deterministic PNG encoding
+# AD-0015 Deterministic PNG and WebP encoding
 
 ## Context
 
@@ -19,12 +19,20 @@ static musl binary built with `cargo zigbuild`.
 `CompressionType::Best` and `FilterType::Adaptive`. The encoder writes no
 metadata chunks and no interlacing. No C library is involved.
 
+`fit::encode_webp` encodes with
+`image::codecs::webp::WebPEncoder::new_lossless`, which is the lossless pure
+Rust encoder of `image-webp`. It writes no metadata chunks (no EXIF, XMP or ICC
+profile). The `image-webp` version is pinned through `Cargo.lock`, so the same
+image and the same pixctl version give the same bytes.
+
 ## Consequences
 
 The same image and the same pixctl version give the same bytes. A change of the
 `image` version or of the two settings can change the bytes, so it is a
 version-level change of `fit`. The PNG files are larger than the output of an
 optimiser such as `oxipng`. Tests pin byte identity across runs, the absence of
-`tEXt`, `iTXt`, `zTXt` and `tIME` chunks, and the two encoder settings.
+`tEXt`, `iTXt`, `zTXt` and `tIME` chunks, and the two encoder settings. For
+WebP, tests pin byte identity and the absence of `EXIF`, `XMP` and `ICCP`
+chunks. A change of the `image-webp` version can change the WebP bytes.
 
 Satisfies: [pixctl#1](https://github.com/driftsys/pixctl/issues/1)

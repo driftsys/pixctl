@@ -1,5 +1,5 @@
 //! The pure part of `fit`: render an image to the display contract and
-//! encode it as a PNG.
+//! encode it as a PNG or a WebP.
 
 use crate::contract::{FRAME, FRAME_COLOUR, PADDING};
 use crate::rule::{Plan, Rule};
