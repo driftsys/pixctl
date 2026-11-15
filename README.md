@@ -80,7 +80,8 @@ text with exit code `2` and no envelope.
 | Code               | Meaning                                                              | `file`               |
 | ------------------ | -------------------------------------------------------------------- | -------------------- |
 | `read_failed`      | The file cannot be opened or decoded, or has no stem.                | the input            |
-| `unsupported_type` | The file is EMF or WMF.                                              | the input            |
+| `unsupported_type` | The file is EMF or WMF and no converter is installed.                | the input            |
+| `convert_failed`   | The EMF/WMF converter fails, times out or writes no usable PNG.      | the input            |
 | `out_dir_failed`   | `fit` cannot create the `--out` directory.                           | the output directory |
 | `same_file`        | The output would overwrite an input.                                 | the input            |
 | `name_collision`   | Two inputs map to one output name.                                   | the later input      |
@@ -193,6 +194,62 @@ $ pixctl inspect --json wide.png
 - An image that fails to load is reported as a coded error and left out of
   `results`. The exit code is `2` when any image fails or the output cannot be
   written.
+
+### EMF and WMF input
+
+`inspect`, `check` and `fit` accept `.emf` and `.wmf` files (the extension may
+be in any case) when Inkscape or LibreOffice is installed. pixctl converts the
+file to a PNG in a temporary directory, removes the directory afterwards, and
+then handles the PNG like any other input. The `path` in the output stays the
+original EMF or WMF path, and `fit` names its output from the original file
+name.
+
+pixctl looks for a converter in this order, and the first match wins:
+
+1. `PIXCTL_CONVERTER`, when set and not empty: the path or name of a program. A
+   name that contains `inkscape` is run as Inkscape, and a name that contains
+   `soffice` or `libreoffice` is run as LibreOffice. Any other name gives
+   `convert_failed`.
+2. `inkscape` on `PATH`.
+3. `soffice` on `PATH`, then `libreoffice` on `PATH`.
+
+Each conversion has a limit of 60 s. Set `PIXCTL_CONVERT_TIMEOUT_SECS` to a
+positive whole number to change it; any other value keeps the default. When the
+limit passes, pixctl kills the converter and reports `convert_failed`, then
+continues with the next file. On Unix the converter runs in its own process
+group and a timeout kills the whole group with the `kill` utility. Without
+`kill`, a process that the converter started can outlive the limit.
+
+Two errors apply (see [Error codes](#error-codes)):
+
+- With no converter installed, the file gets `unsupported_type`, with the hint
+  `install Inkscape or LibreOffice, or set PIXCTL_CONVERTER`.
+- When the converter exits with a non-zero status, times out, or exits without
+  writing a PNG that can be decoded, the file gets `convert_failed`. The message
+  names the converter and says what happened.
+
+The examples use Inkscape, found on `PATH`. The output was produced with a
+script that stands in for Inkscape and returns a 300x200 white PNG, because no
+converter was installed on the machine that wrote this page.
+
+```console
+$ pixctl inspect diagram.wmf
+diagram.wmf  300x200  alpha=false  font=?px (low)  rule=unchanged x1 -> 334px
+1 image: 0 icon, 1 unchanged, 0 upscale, 0 too-small, 0 oversize
+$ pixctl fit diagram.wmf --out o
+FIT  [unchanged] diagram.wmf  o/diagram.png (334×234)
+```
+
+When Inkscape exits with status 3, the `errors` entry of
+`pixctl inspect --json diagram.wmf` is:
+
+```json
+{
+  "code": "convert_failed",
+  "message": "inkscape: failed with exit status: 3",
+  "file": "diagram.wmf"
+}
+```
 
 ### check
 
