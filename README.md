@@ -496,9 +496,10 @@ PASS  [framed] fitted/clear.png  frame and padding present
 ```
 
 `fit` is deterministic: the same image and the same version give the same output
-bytes on every run, for both formats. The PNG encoder uses fixed settings,
-writes no metadata and no interlacing. The WebP encoder is lossless and writes
-no metadata. The files are not optimised for size.
+bytes on every run, for both formats. For an EMF or WMF input this holds only
+with the same converter and converter version. The PNG encoder uses fixed
+settings, writes no metadata and no interlacing. The WebP encoder is lossless
+and writes no metadata. The files are not optimised for size.
 
 Two cases are errors for the image that causes them, with the codes
 `name_collision` and `same_file`:

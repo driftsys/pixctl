@@ -45,10 +45,10 @@ just verify     # commit-message lint + full gate — run before opening a PR
 just release    # git-std bump (changelog + tag) on a clean, CI-green main
 ```
 
-`just test-converter` runs the ignored tests that need a real Inkscape; the
-`converter` CI job installs Inkscape and runs it. The WMF fixture
-`tests/fixtures/rect.wmf` was built by hand from the WMF specification (see the
-comment in `tests/convert.rs`).
+`just test-converter` runs the ignored test that needs a real Inkscape, and
+fails when it does not run; the `converter` CI job installs Inkscape and runs
+it. The WMF fixture `tests/fixtures/rect.wmf` was built by hand from the WMF
+specification (see the comment in `tests/convert.rs`).
 
 CI (`.github/workflows/ci.yml`) runs only `just` recipes. Releases are built by
 cargo-dist (`release.yml`) on a `v*` tag.

@@ -143,6 +143,7 @@ fn inspect_uses_the_soffice_converter_on_a_wmf() {
     let r = &json(&out)["results"][0];
     assert_eq!(r["path"], input.to_str().unwrap());
     assert_eq!(r["width"].as_u64(), Some(40));
+    assert_eq!(r["converter"], "fake-soffice");
 }
 
 #[test]
@@ -153,12 +154,17 @@ fn converter_is_found_on_path() {
     fake_inkscape(&bin, &fixture(d.path()));
     std::fs::rename(bin.join("fake-inkscape"), bin.join("inkscape")).unwrap();
     let input = emf(d.path(), "a.emf");
-    pixctl()
+    let out = pixctl()
         .env("PATH", &bin)
-        .arg("inspect")
+        .env_remove("PIXCTL_CONVERTER")
+        .args(["inspect", "--json"])
         .arg(&input)
         .assert()
-        .success();
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json(&out)["results"][0]["converter"], "inkscape");
 }
 
 #[test]

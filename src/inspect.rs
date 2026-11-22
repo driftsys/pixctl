@@ -254,4 +254,27 @@ mod tests {
         let json = serde_json::to_string(&[report]).expect("serialises");
         assert!(json.contains("\"bad\u{FFFD}.png\""), "{json}");
     }
+
+    #[test]
+    fn plain_line_has_no_via_suffix_without_a_converter() {
+        let report = Report {
+            path: PathBuf::from("a.png"),
+            width: 1,
+            height: 1,
+            alpha: false,
+            font: FontReport {
+                px: None,
+                confidence: Confidence::Low,
+                lines: 0,
+                glyphs: 0,
+                source: FontSource::Estimate,
+            },
+            rule: Rule::Icon,
+            factor: 1.0,
+            output_width: 1,
+            converter: None,
+        };
+        let line = plain_line(&report);
+        assert!(line.ends_with("-> 1px"), "{line}");
+    }
 }

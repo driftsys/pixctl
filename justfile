@@ -36,9 +36,10 @@ compile:
 test:
     cargo test --all --locked
 
-# Run the tests that need a real EMF/WMF converter (Inkscape on PATH).
+# Run the test that needs a real EMF/WMF converter (Inkscape on PATH). Fails
+# when the test does not run, for example after a rename.
 test-converter:
-    cargo test --locked -- --ignored converter
+    cargo test --locked --test convert -- --ignored --exact converter_real_inkscape_converts_a_wmf 2>&1 | tee /dev/stderr | grep -q 'test result: ok. 1 passed'
 
 # Lint the install scripts.
 shellcheck:
