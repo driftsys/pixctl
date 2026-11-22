@@ -67,15 +67,16 @@ is given.
 - JSON: the envelope in [output.md](output.md), schema `pixctl/inspect/v1`.
   `results` is one object per image that loaded, with `path`, `width`, `height`,
   `alpha`, `font { px, confidence, lines, glyphs, source }`, `rule`, `factor`,
-  `output_width`, and `converter` (the converter program) for an EMF/WMF input
-  only. `source` is `estimate` or `override`. With `--font-px`, confidence is
-  `high` and `lines`/`glyphs` are `0`. Rules are kebab-case. `path` is written
-  with invalid UTF-8 replaced by U+FFFD, so one path never stops the output.
-  `summary` is `{images, icon, unchanged, upscale, too_small,
-  oversize}`,
-  counted over the results.
-- Plain: one line per image, with the font shown as `<px>px` or `?px` and a
-  `via=<name>` suffix for a converted input, then
+  `output_width`, and `converter` (the file name of the converter program) for
+  an EMF/WMF input only. `source` is `estimate` or `override`. With `--font-px`,
+  confidence is `high` and `lines`/`glyphs` are `0`. Rules are kebab-case.
+  `path` is written with invalid UTF-8 replaced by U+FFFD, so one path never
+  stops the output. `summary` is
+  `{images, icon, unchanged, upscale, too_small,
+  oversize}`, counted over the
+  results.
+- Plain: one line per image, with the font shown as `<px>px` or `?px`, ending
+  with `via=<name>` for a converted input, then
   `N images: a icon, b unchanged, c upscale, d too-small, e oversize` when at
   least one image loaded.
 - Load failures are coded errors. They go to stderr as `pixctl: <message>` and,

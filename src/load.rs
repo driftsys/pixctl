@@ -22,7 +22,8 @@ pub struct Loaded {
 /// positive number of seconds, default 60) select and limit it.
 ///
 /// Fails with `unsupported_type` for EMF/WMF when no converter is found,
-/// `convert_failed` when the converter fails (also for a missing or corrupt
+/// `convert_failed` when `PIXCTL_CONVERTER` names an unknown program or the
+/// conversion fails (also for a missing or corrupt
 /// EMF/WMF file when a converter is found), and `read_failed` when any other
 /// file cannot be opened or decoded.
 pub fn load(path: &Path) -> Result<Loaded, Failure> {

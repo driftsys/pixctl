@@ -23,8 +23,9 @@ Implemented in milestone M1. Decisions:
 - Supported input formats are PNG, JPEG, BMP, GIF, TIFF and WebP. EMF and WMF
   files are converted to PNG with an external converter
   ([AD-0008](../decisions/0008-emf-wmf-external-converter.md)). The report of a
-  converted file names the converter program: the JSON `converter` field, and
-  `via=<name>` at the end of the plain line. Other formats have neither.
+  converted file names the file name of the converter program: the JSON
+  `converter` field, and `via=<name>` at the end of the plain line. Other
+  formats have neither.
 - `--font-px F` replaces the estimate for every input. `F` is a positive number
   and may be a decimal. The CLI rejects `0`, negative values and non-numbers
   with exit `2`.

@@ -30,15 +30,15 @@ from one JSON document. A person gets a short text output.
   without `--json`.
 - The codes:
 
-| Code               | Meaning                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| `read_failed`      | The file cannot be opened or decoded, or has no file stem.                            |
-| `unsupported_type` | The file is EMF or WMF and no converter is found.                                     |
-| `convert_failed`   | The converter is unknown, cannot start, fails, times out, or writes no decodable PNG. |
-| `out_dir_failed`   | `fit` cannot create the `--out` directory.                                            |
-| `same_file`        | The `fit` output would overwrite an input.                                            |
-| `name_collision`   | Two inputs map to one output name; `with` is the earlier one                          |
-| `write_failed`     | `fit` cannot write the output or a status line.                                       |
+| Code               | Meaning                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `read_failed`      | The file cannot be opened or decoded, or has no file stem.                                                                         |
+| `unsupported_type` | The file is EMF or WMF and no converter is found.                                                                                  |
+| `convert_failed`   | The converter is unknown, cannot start, fails, times out or writes no decodable PNG, or its temporary directory cannot be created. |
+| `out_dir_failed`   | `fit` cannot create the `--out` directory.                                                                                         |
+| `same_file`        | The `fit` output would overwrite an input.                                                                                         |
+| `name_collision`   | Two inputs map to one output name; `with` is the earlier one                                                                       |
+| `write_failed`     | `fit` cannot write the output or a status line.                                                                                    |
 
 A dangling symbolic link at the `fit` target is also `write_failed`.
 

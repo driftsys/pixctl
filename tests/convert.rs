@@ -156,7 +156,6 @@ fn converter_is_found_on_path() {
     let input = emf(d.path(), "a.emf");
     let out = pixctl()
         .env("PATH", &bin)
-        .env_remove("PIXCTL_CONVERTER")
         .args(["inspect", "--json"])
         .arg(&input)
         .assert()
@@ -267,6 +266,22 @@ fn unknown_converter_name_gives_convert_failed_with_a_hint() {
     assert_eq!(e["code"], "convert_failed");
     assert!(e["hint"].as_str().unwrap().contains("Inkscape"));
     assert_eq!(e["file"], input.to_str().unwrap());
+}
+
+#[test]
+fn converter_that_cannot_start_gives_convert_failed() {
+    let d = TempDir::new().unwrap();
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", d.path().join("missing/inkscape"))
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json(&out)["errors"][0]["code"], "convert_failed");
 }
 
 #[test]
@@ -443,4 +458,5 @@ fn converter_real_inkscape_converts_a_wmf() {
     let r = &json(&out)["results"][0];
     assert!(r["width"].as_u64().unwrap() > 0);
     assert!(r["height"].as_u64().unwrap() > 0);
+    assert_eq!(r["converter"], "inkscape");
 }

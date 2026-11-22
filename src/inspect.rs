@@ -36,7 +36,7 @@ pub struct Report {
     pub rule: Rule,
     pub factor: f32,
     pub output_width: u32,
-    /// The converter program for an EMF/WMF input; absent for other formats.
+    /// The file name of the converter program for an EMF/WMF input; absent for other formats.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converter: Option<String>,
 }
@@ -275,6 +275,6 @@ mod tests {
             converter: None,
         };
         let line = plain_line(&report);
-        assert!(line.ends_with("-> 1px"), "{line}");
+        assert!(!line.contains("via="), "{line}");
     }
 }
