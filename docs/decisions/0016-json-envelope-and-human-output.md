@@ -29,11 +29,11 @@ pixctl mirrors tblctl AD-0005.
 - An error object has `code` and `message`, plus `file`, `hint` and `with` when
   they apply. Each error is also written to stderr as `pixctl: <message>`, in
   JSON mode and in text mode.
-- The error codes are `read_failed`, `unsupported_type`, `out_dir_failed`,
-  `same_file`, `name_collision` (`with` names the earlier input) and
-  `write_failed`. Three calls fix edge cases: a dangling symbolic link at the
-  `fit` target is `write_failed`; an input without a file stem is `read_failed`;
-  a failed write of a `FIT` status line is `write_failed`.
+- The error codes are `read_failed`, `unsupported_type`, `convert_failed`,
+  `out_dir_failed`, `same_file`, `name_collision` (`with` names the earlier
+  input) and `write_failed`. Three calls fix edge cases: a dangling symbolic
+  link at the `fit` target is `write_failed`; an input without a file stem is
+  `read_failed`; a failed write of a `FIT` status line is `write_failed`.
 - `check` results are one object per image with a nested `checks` array. The
   image status is the worst of its checks (fail over review over pass). Under
   `--strict` the status stays `review` and only the exit code changes.

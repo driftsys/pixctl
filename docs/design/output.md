@@ -22,8 +22,9 @@ command builds its results, summary and errors, then prints them in one place.
 - `output::paint(tag, enabled)` wraps `PASS` (32), `FAIL` (31) or `REVIEW` (33)
   in ANSI codes. The two spaces after the tag stay outside the codes.
 - `output::count(n, noun)` gives `1 image` or `3 images`.
-- `load::load(path) -> Result<Loaded, Failure>` gives `read_failed` and
-  `unsupported_type`, so the codes do not depend on message text.
+- `load::load(path) -> Result<Loaded, Failure>` gives `read_failed`,
+  `unsupported_type` and `convert_failed`, so the codes do not depend on message
+  text.
 - `inspect::run`, `check::run` and `fit_cmd::run` take `json` and the writers;
   `check::run` also takes `color`.
 
@@ -55,6 +56,6 @@ writer, the order of error lines, the hints and the claimed output name.
 order and schema, a mixed run, a run where every input fails, `--strict` with a
 review image, the summary lines, colour with `CLICOLOR_FORCE` and `NO_COLOR`, an
 empty stdout for `fit` in text mode, and the codes `read_failed`,
-`unsupported_type`, `out_dir_failed`, `same_file`, `name_collision` and
-`write_failed` (a blocked target). `tests/cli.rs` covers the `Examples:` help
-sections.
+`unsupported_type`, `convert_failed` (`tests/convert.rs`), `out_dir_failed`,
+`same_file`, `name_collision` and `write_failed` (a blocked target).
+`tests/cli.rs` covers the `Examples:` help sections.
