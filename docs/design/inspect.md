@@ -8,16 +8,16 @@ One crate. `src/lib.rs` declares the modules; `src/main.rs` is thin glue that
 parses the arguments, calls the commands. `check` and `fit` are in
 [check-fit.md](check-fit.md).
 
-| Module                                 | Purpose                                                                                     |
-| -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                |
-| [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md)) |
-| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`     |
-| [`convert.rs`](../../src/convert.rs)   | finds Inkscape or LibreOffice and converts EMF/WMF to PNG with a time limit                 |
-| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                 |
-| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                             |
-| [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                  |
-| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                   |
+| Module                                 | Purpose                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                           |
+| [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md))            |
+| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`                |
+| [`convert.rs`](../../src/convert.rs)   | finds Inkscape or LibreOffice and converts EMF/WMF to PNG with a time limit ([convert.md](convert.md)) |
+| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                            |
+| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                                        |
+| [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                             |
+| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                              |
 
 ## Interfaces
 
