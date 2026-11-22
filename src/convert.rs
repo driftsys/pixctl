@@ -287,6 +287,19 @@ mod tests {
     }
 
     #[test]
+    fn explicit_value_wins_over_a_converter_on_path() {
+        let d = tempfile::tempdir().unwrap();
+        stub(d.path(), "inkscape");
+        let c = find_in(Some(OsStr::new("/x/soffice")), Some(d.path().as_os_str()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (c.kind, c.program),
+            (Kind::LibreOffice, PathBuf::from("/x/soffice"))
+        );
+    }
+
+    #[test]
     fn path_order_is_inkscape_soffice_libreoffice() {
         let d = tempfile::tempdir().unwrap();
         let path = d.path().as_os_str();

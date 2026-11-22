@@ -155,7 +155,11 @@ fn bad_file_among_good_ones() {
     let emf = dir.path().join("a.emf");
     std::fs::write(&emf, b"emf").unwrap();
     let good2 = blank_png(dir.path(), "good2.png", 200, 100);
+    // No converter may be found, so `a.emf` fails with `unsupported_type`.
+    let empty = TempDir::new().unwrap();
     let out = pixctl()
+        .env_remove("PIXCTL_CONVERTER")
+        .env("PATH", empty.path())
         .args(["inspect", "--json"])
         .args([&good, &corrupt, &missing, &emf, &good2])
         .output()
@@ -326,7 +330,11 @@ fn mixed_run_has_results_and_errors() {
     let good = blank_png(dir.path(), "good.png", 300, 200);
     let emf = dir.path().join("a.emf");
     std::fs::write(&emf, b"emf").unwrap();
+    // No converter may be found, so `a.emf` fails with `unsupported_type`.
+    let empty = TempDir::new().unwrap();
     let out = pixctl()
+        .env_remove("PIXCTL_CONVERTER")
+        .env("PATH", empty.path())
         .args(["inspect", "--json"])
         .args([&good, &emf])
         .output()

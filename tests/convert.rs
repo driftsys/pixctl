@@ -36,7 +36,7 @@ fn fake_inkscape(dir: &Path, png: &Path) -> PathBuf {
         dir,
         "fake-inkscape",
         &format!(
-            "for a in \"$@\"; do case \"$a\" in --export-filename=*) out=\"${{a#--export-filename=}}\";; esac; done\ncp '{}' \"$out\"",
+            "t=0; for a in \"$@\"; do case \"$a\" in --export-filename=*) out=\"${{a#--export-filename=}}\";; --export-type=png) t=1;; esac; done\n[ $t = 1 ] || exit 1\ncp '{}' \"$out\"",
             png.display()
         ),
     )
@@ -48,7 +48,7 @@ fn fake_soffice(dir: &Path, png: &Path) -> PathBuf {
         dir,
         "fake-soffice",
         &format!(
-            "while [ $# -gt 0 ]; do case \"$1\" in --outdir) outdir=\"$2\"; shift;; -*) ;; *) in=\"$1\";; esac; shift; done\nb=$(basename \"$in\")\ncp '{}' \"$outdir/${{b%.*}}.png\"",
+            "h=0; c=0; while [ $# -gt 0 ]; do case \"$1\" in --headless) h=1;; --convert-to) [ \"$2\" = png ] && c=1; shift;; --outdir) outdir=\"$2\"; shift;; -*) ;; *) in=\"$1\";; esac; shift; done\n[ $h = 1 ] && [ $c = 1 ] || exit 1\nb=$(basename \"$in\")\ncp '{}' \"$outdir/${{b%.*}}.png\"",
             png.display()
         ),
     )
@@ -216,6 +216,35 @@ fn no_png_written_gives_convert_failed() {
 }
 
 #[test]
+fn a_non_png_output_gives_convert_failed() {
+    let d = TempDir::new().unwrap();
+    let garbage = d.path().join("garbage.bin");
+    std::fs::write(&garbage, b"this is not a png").unwrap();
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!(
+            "for a in \"$@\"; do case \"$a\" in --export-filename=*) out=\"${{a#--export-filename=}}\";; esac; done\ncp '{}' \"$out\"",
+            garbage.display()
+        ),
+    );
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    let e = &json(&out)["errors"][0];
+    assert_eq!(e["code"], "convert_failed");
+    assert!(e["message"].as_str().unwrap().contains("cannot be decoded"));
+    assert_eq!(e["file"], input.to_str().unwrap());
+}
+
+#[test]
 fn unknown_converter_name_gives_convert_failed_with_a_hint() {
     let d = TempDir::new().unwrap();
     let input = emf(d.path(), "a.emf");
@@ -231,6 +260,7 @@ fn unknown_converter_name_gives_convert_failed_with_a_hint() {
     let e = &json(&out)["errors"][0];
     assert_eq!(e["code"], "convert_failed");
     assert!(e["hint"].as_str().unwrap().contains("Inkscape"));
+    assert_eq!(e["file"], input.to_str().unwrap());
 }
 
 #[test]
@@ -275,6 +305,7 @@ fn no_converter_gives_unsupported_type_with_the_hint() {
         .clone();
     let e = &json(&out)["errors"][0];
     assert_eq!(e["code"], "unsupported_type");
+    assert_eq!(e["file"], input.to_str().unwrap());
     assert_eq!(
         e["hint"],
         "install Inkscape or LibreOffice, or set PIXCTL_CONVERTER"
