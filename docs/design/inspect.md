@@ -8,25 +8,27 @@ One crate. `src/lib.rs` declares the modules; `src/main.rs` is thin glue that
 parses the arguments, calls the commands. `check` and `fit` are in
 [check-fit.md](check-fit.md).
 
-| Module                                 | Purpose                                                                                     |
-| -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                |
-| [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md)) |
-| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`     |
-| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                 |
-| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                             |
-| [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                  |
-| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                   |
+| Module                                 | Purpose                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`cli.rs`](../../src/cli.rs)           | `clap` definitions; validates `--font-px` (positive, finite)                                           |
+| [`contract.rs`](../../src/contract.rs) | display contract constants and version ([AD-0002](../decisions/0002-contract-constants.md))            |
+| [`load.rs`](../../src/load.rs)         | decodes to RGBA8; `has_alpha` is true when any pixel has alpha < 255; `flatten_to_gray`                |
+| [`convert.rs`](../../src/convert.rs)   | finds Inkscape or LibreOffice and converts EMF/WMF to PNG with a time limit ([convert.md](convert.md)) |
+| [`font.rs`](../../src/font.rs)         | pure `estimate(&GrayImage) -> FontEstimate`                                                            |
+| [`rule.rs`](../../src/rule.rs)         | pure `plan(w, h, font_px: Option<f32>) -> Plan`                                                        |
+| [`output.rs`](../../src/output.rs)     | JSON envelope, coded `Failure`, colour and counts ([output.md](output.md))                             |
+| [`inspect.rs`](../../src/inspect.rs)   | builds one `Report` per image, prints plain lines or JSON                                              |
 
 ## Interfaces
 
 - `contract`: `CONTRACT_VERSION = 1`, `COLUMN = 800`, `MIN_FONT_PX = 11`,
   `TARGET_FONT_PX = 12`, `PADDING = 16`, `FRAME = 1`, `FRAME_COLOUR = #d0d7de`,
   `ICON_MAX = 64`, `CONTENT_WIDTH = COLUMN − 2 × (PADDING + FRAME) = 766`.
-- `load::load(path) -> Result<Loaded { rgba, has_alpha }, Failure>`. Paths
-  ending in `.emf`/`.wmf` (any case) give `unsupported_type`; a file that cannot
-  be opened or decoded gives `read_failed`. Errors carry the path
-  ([output.md](output.md)).
+- `load::load(path) -> Result<Loaded { rgba, has_alpha, converter }, Failure>`.
+  Paths ending in `.emf`/`.wmf` (any case) are converted to PNG through
+  `convert::find_in` and `convert::to_png` (`unsupported_type` when no converter
+  is found, `convert_failed` when it fails); a file that cannot be opened or
+  decoded gives `read_failed`. Errors carry the path ([output.md](output.md)).
 - `load::flatten_to_gray(&RgbaImage) -> GrayImage` composites onto white and
   converts to greyscale.
 - `font::estimate` returns `px: Option<f32>`, `confidence: High | Low`, and the
@@ -65,14 +67,16 @@ is given.
 - JSON: the envelope in [output.md](output.md), schema `pixctl/inspect/v1`.
   `results` is one object per image that loaded, with `path`, `width`, `height`,
   `alpha`, `font { px, confidence, lines, glyphs, source }`, `rule`, `factor`,
-  `output_width`. `source` is `estimate` or `override`. With `--font-px`,
+  `output_width`, and `converter` (the file name of the converter program) for
+  an EMF/WMF input only. `source` is `estimate` or `override`. With `--font-px`,
   confidence is `high` and `lines`/`glyphs` are `0`. Rules are kebab-case.
   `path` is written with invalid UTF-8 replaced by U+FFFD, so one path never
   stops the output. `summary` is
   `{images, icon, unchanged, upscale, too_small,
   oversize}`, counted over the
   results.
-- Plain: one line per image, with the font shown as `<px>px` or `?px`, then
+- Plain: one line per image, with the font shown as `<px>px` or `?px`, ending
+  with `via=<name>` for a converted input, then
   `N images: a icon, b unchanged, c upscale, d too-small, e oversize` when at
   least one image loaded.
 - Load failures are coded errors. They go to stderr as `pixctl: <message>` and,

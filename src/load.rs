@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use crate::convert;
 use crate::output::Failure;
 use image::{GrayImage, Luma, RgbaImage};
 
@@ -10,36 +11,69 @@ pub struct Loaded {
     pub rgba: RgbaImage,
     /// True when at least one pixel has alpha below 255.
     pub has_alpha: bool,
+    /// The file name of the converter program for an EMF/WMF input.
+    pub converter: Option<String>,
 }
 
 /// Decode the image at `path` to RGBA8.
 ///
-/// Fails with `unsupported_type` for EMF/WMF and `read_failed` when the file
-/// cannot be opened or decoded.
+/// EMF and WMF files go through an external converter. The environment
+/// variables `PIXCTL_CONVERTER`, `PATH` and `PIXCTL_CONVERT_TIMEOUT_SECS` (a
+/// positive number of seconds, default 60) select and limit it.
+///
+/// Fails with `unsupported_type` for EMF/WMF when no converter is found,
+/// `convert_failed` when `PIXCTL_CONVERTER` names an unknown program or the
+/// conversion fails (also for a missing or corrupt
+/// EMF/WMF file when a converter is found), and `read_failed` when any other
+/// file cannot be opened or decoded.
 pub fn load(path: &Path) -> Result<Loaded, Failure> {
     let ext = path
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
-    if matches!(ext.as_deref(), Some("emf" | "wmf")) {
-        return Err(Failure {
-            code: "unsupported_type",
-            message: format!("unsupported image format (EMF/WMF): {}", path.display()),
-            file: Some(path.to_string_lossy().into_owned()),
-            hint: None,
-            with: None,
-        });
-    }
-    let rgba = image::open(path)
-        .map_err(|e| Failure {
-            code: "read_failed",
-            message: format!("cannot decode image {}: {e}", path.display()),
-            file: Some(path.to_string_lossy().into_owned()),
-            hint: None,
-            with: None,
-        })?
-        .to_rgba8();
+    let mut converter = None;
+    let rgba = if matches!(ext.as_deref(), Some("emf" | "wmf")) {
+        let explicit = std::env::var_os("PIXCTL_CONVERTER");
+        let path_var = std::env::var_os("PATH");
+        let conv = convert::find_in(explicit.as_deref(), path_var.as_deref())
+            .map_err(|mut f| {
+                f.file = Some(path.to_string_lossy().into_owned());
+                f
+            })?
+            .ok_or_else(|| Failure {
+                code: "unsupported_type",
+                message: format!(
+                    "unsupported image format (EMF/WMF) without a converter: {}",
+                    path.display()
+                ),
+                file: Some(path.to_string_lossy().into_owned()),
+                hint: Some(convert::MISSING_HINT.to_string()),
+                with: None,
+            })?;
+        let limit =
+            convert::parse_timeout(std::env::var("PIXCTL_CONVERT_TIMEOUT_SECS").ok().as_deref());
+        let rgba = convert::to_png(&conv, path, limit)?.to_rgba8();
+        converter = conv
+            .program
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned());
+        rgba
+    } else {
+        image::open(path)
+            .map_err(|e| Failure {
+                code: "read_failed",
+                message: format!("cannot decode image {}: {e}", path.display()),
+                file: Some(path.to_string_lossy().into_owned()),
+                hint: None,
+                with: None,
+            })?
+            .to_rgba8()
+    };
     let has_alpha = rgba.pixels().any(|p| p.0[3] < 255);
-    Ok(Loaded { rgba, has_alpha })
+    Ok(Loaded {
+        rgba,
+        has_alpha,
+        converter,
+    })
 }
 
 /// Composites RGBA onto white, then converts to Rec. 601 luma.
@@ -148,30 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn emf_is_unsupported() {
-        let (_d, p) = tmp("a.emf");
-        std::fs::write(&p, b"").unwrap();
-        let err = load(&p).err().expect("emf must fail");
-        assert!(format!("{err:#}").contains("unsupported"));
-    }
-
-    #[test]
-    fn wmf_and_upper_case_extensions_are_unsupported() {
-        for name in ["a.wmf", "b.EMF", "c.Wmf"] {
-            let (_d, p) = tmp(name);
-            std::fs::write(&p, b"").unwrap();
-            let err = load(&p).err().expect("emf/wmf must fail");
-            assert!(format!("{err:#}").contains("unsupported"), "{name}");
-        }
-    }
-
-    #[test]
     fn load_failures_carry_codes() {
-        let (_d, p) = tmp("a.emf");
-        std::fs::write(&p, b"").unwrap();
-        let f = load(&p).err().expect("emf must fail");
-        assert_eq!(f.code, "unsupported_type");
-        assert_eq!(f.file.as_deref(), Some(p.to_str().unwrap()));
         let (_d, p) = tmp("nope.png");
         let f = load(&p).err().expect("missing file must fail");
         assert_eq!(f.code, "read_failed");

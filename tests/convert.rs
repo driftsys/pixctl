@@ -1,0 +1,462 @@
+//! End-to-end tests for EMF/WMF conversion, with fake converter scripts.
+#![cfg(unix)]
+
+use assert_cmd::Command;
+use serde_json::Value;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
+
+fn pixctl() -> Command {
+    let mut c = Command::cargo_bin("pixctl").unwrap();
+    c.env_remove("PIXCTL_CONVERTER")
+        .env_remove("PIXCTL_CONVERT_TIMEOUT_SECS")
+        .env("PATH", "");
+    c
+}
+
+fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
+    let p = dir.join(name);
+    std::fs::write(&p, format!("#!/bin/sh\nPATH=/bin:/usr/bin\n{body}\n")).unwrap();
+    std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+    p
+}
+
+fn fixture(dir: &Path) -> PathBuf {
+    let p = dir.join("fixture.png");
+    image::RgbaImage::from_pixel(40, 30, image::Rgba([10, 20, 30, 255]))
+        .save(&p)
+        .unwrap();
+    p
+}
+
+/// An Inkscape fake that copies `png` to the `--export-filename=` value.
+fn fake_inkscape(dir: &Path, png: &Path) -> PathBuf {
+    script(
+        dir,
+        "fake-inkscape",
+        &format!(
+            "t=0; for a in \"$@\"; do case \"$a\" in --export-filename=*) out=\"${{a#--export-filename=}}\";; --export-type=png) t=1;; esac; done\n[ $t = 1 ] || exit 1\ncp '{}' \"$out\"",
+            png.display()
+        ),
+    )
+}
+
+/// A soffice fake that writes `<outdir>/<stem>.png`.
+fn fake_soffice(dir: &Path, png: &Path) -> PathBuf {
+    script(
+        dir,
+        "fake-soffice",
+        &format!(
+            "h=0; c=0; while [ $# -gt 0 ]; do case \"$1\" in --headless) h=1;; --convert-to) [ \"$2\" = png ] && c=1; shift;; --outdir) outdir=\"$2\"; shift;; -*) ;; *) in=\"$1\";; esac; shift; done\n[ $h = 1 ] && [ $c = 1 ] || exit 1\nb=$(basename \"$in\")\ncp '{}' \"$outdir/${{b%.*}}.png\"",
+            png.display()
+        ),
+    )
+}
+
+fn emf(dir: &Path, name: &str) -> PathBuf {
+    let p = dir.join(name);
+    std::fs::write(&p, b"not a real emf").unwrap();
+    p
+}
+
+fn json(out: &[u8]) -> Value {
+    serde_json::from_slice(out).unwrap()
+}
+
+#[test]
+fn inspect_uses_the_inkscape_converter() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_inkscape(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let r = &json(&out)["results"][0];
+    assert_eq!(r["path"], input.to_str().unwrap());
+    assert_eq!(
+        (r["width"].as_u64(), r["height"].as_u64()),
+        (Some(40), Some(30))
+    );
+    assert_eq!(r["converter"], "fake-inkscape");
+}
+
+#[test]
+fn inspect_names_the_converter_in_the_plain_line() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_inkscape(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let line = String::from_utf8(out).unwrap();
+    assert!(
+        line.lines()
+            .next()
+            .unwrap()
+            .ends_with("  via=fake-inkscape"),
+        "{line}"
+    );
+}
+
+#[test]
+fn inspect_omits_the_converter_for_a_png() {
+    let d = TempDir::new().unwrap();
+    let input = fixture(d.path());
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(json(&out)["results"][0].get("converter").is_none());
+}
+
+#[test]
+fn inspect_uses_the_soffice_converter_on_a_wmf() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_soffice(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "b.wmf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let r = &json(&out)["results"][0];
+    assert_eq!(r["path"], input.to_str().unwrap());
+    assert_eq!(r["width"].as_u64(), Some(40));
+    assert_eq!(r["converter"], "fake-soffice");
+}
+
+#[test]
+fn converter_is_found_on_path() {
+    let d = TempDir::new().unwrap();
+    let bin = d.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    fake_inkscape(&bin, &fixture(d.path()));
+    std::fs::rename(bin.join("fake-inkscape"), bin.join("inkscape")).unwrap();
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PATH", &bin)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json(&out)["results"][0]["converter"], "inkscape");
+}
+
+#[test]
+fn fit_converts_an_upper_case_extension() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_inkscape(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.EMF");
+    let out = d.path().join("out");
+    pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("fit")
+        .arg(&input)
+        .arg("--out")
+        .arg(&out)
+        .assert()
+        .success();
+    assert!(out.join("a.png").is_file());
+}
+
+#[test]
+fn nonzero_exit_gives_convert_failed_with_the_status() {
+    let d = TempDir::new().unwrap();
+    let conv = script(d.path(), "fake-inkscape", "exit 3");
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    let e = &json(&out)["errors"][0];
+    assert_eq!(e["code"], "convert_failed");
+    assert!(e["message"].as_str().unwrap().contains("exit status: 3"));
+    assert_eq!(e["file"], input.to_str().unwrap());
+}
+
+#[test]
+fn no_png_written_gives_convert_failed() {
+    let d = TempDir::new().unwrap();
+    let conv = script(d.path(), "fake-soffice", "exit 0");
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json(&out)["errors"][0]["code"], "convert_failed");
+}
+
+#[test]
+fn a_non_png_output_gives_convert_failed() {
+    let d = TempDir::new().unwrap();
+    let garbage = d.path().join("garbage.bin");
+    std::fs::write(&garbage, b"this is not a png").unwrap();
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!(
+            "for a in \"$@\"; do case \"$a\" in --export-filename=*) out=\"${{a#--export-filename=}}\";; esac; done\ncp '{}' \"$out\"",
+            garbage.display()
+        ),
+    );
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    let e = &json(&out)["errors"][0];
+    assert_eq!(e["code"], "convert_failed");
+    assert!(e["message"].as_str().unwrap().contains("cannot be decoded"));
+    assert_eq!(e["file"], input.to_str().unwrap());
+}
+
+#[test]
+fn unknown_converter_name_gives_convert_failed_with_a_hint() {
+    let d = TempDir::new().unwrap();
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", "gimp")
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    let e = &json(&out)["errors"][0];
+    assert_eq!(e["code"], "convert_failed");
+    assert!(e["hint"].as_str().unwrap().contains("Inkscape"));
+    assert_eq!(e["file"], input.to_str().unwrap());
+}
+
+#[test]
+fn converter_that_cannot_start_gives_convert_failed() {
+    let d = TempDir::new().unwrap();
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", d.path().join("missing/inkscape"))
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json(&out)["errors"][0]["code"], "convert_failed");
+}
+
+#[test]
+fn a_hanging_converter_is_killed_and_the_next_file_is_processed() {
+    let d = TempDir::new().unwrap();
+    let png = fixture(d.path());
+    let conv = script(d.path(), "fake-inkscape", "sleep 30");
+    let input = emf(d.path(), "a.emf");
+    let start = std::time::Instant::now();
+    let out = pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .env("PIXCTL_CONVERT_TIMEOUT_SECS", "1")
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .arg(&png)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    assert!(start.elapsed().as_secs() < 20);
+    let v = json(&out);
+    assert_eq!(v["errors"][0]["code"], "convert_failed");
+    assert!(v["errors"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("timed out"));
+    assert_eq!(v["results"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn no_converter_gives_unsupported_type_with_the_hint() {
+    let d = TempDir::new().unwrap();
+    let input = emf(d.path(), "a.emf");
+    let out = pixctl()
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+    let e = &json(&out)["errors"][0];
+    assert_eq!(e["code"], "unsupported_type");
+    assert_eq!(e["file"], input.to_str().unwrap());
+    assert_eq!(
+        e["hint"],
+        "install Inkscape or LibreOffice, or set PIXCTL_CONVERTER"
+    );
+}
+
+#[test]
+fn the_temporary_directory_is_removed_on_success_and_failure() {
+    let d = TempDir::new().unwrap();
+    let tmpdir = d.path().join("tmp");
+    std::fs::create_dir(&tmpdir).unwrap();
+    let png = fixture(d.path());
+    let good = fake_inkscape(d.path(), &png);
+    let bad = script(d.path(), "fake-soffice", "exit 1");
+    let input = emf(d.path(), "a.emf");
+    for conv in [good, bad] {
+        pixctl()
+            .env("TMPDIR", &tmpdir)
+            .env("PIXCTL_CONVERTER", &conv)
+            .arg("inspect")
+            .arg(&input)
+            .assert()
+            .code(predicates::prelude::predicate::in_iter([0, 2]));
+        let left: Vec<_> = std::fs::read_dir(&tmpdir).unwrap().collect();
+        assert!(left.is_empty(), "{left:?}");
+    }
+}
+
+#[test]
+fn a_stem_with_a_dot_is_converted_by_soffice() {
+    let d = TempDir::new().unwrap();
+    let conv = fake_soffice(d.path(), &fixture(d.path()));
+    let input = emf(d.path(), "a.b.emf");
+    pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .success();
+}
+
+#[test]
+fn a_relative_input_starting_with_a_dash_is_passed_with_a_prefix() {
+    let d = TempDir::new().unwrap();
+    let args = d.path().join("args.txt");
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!("printf '%s\\n' \"$@\" > '{}'\nexit 1", args.display()),
+    );
+    emf(d.path(), "-x.emf");
+    pixctl()
+        .current_dir(d.path())
+        .env("PIXCTL_CONVERTER", &conv)
+        .arg("inspect")
+        .arg("--")
+        .arg("-x.emf")
+        .assert()
+        .code(2);
+    let recorded = std::fs::read_to_string(&args).unwrap();
+    assert_eq!(recorded.lines().next(), Some("./-x.emf"), "{recorded}");
+}
+
+#[test]
+fn the_temporary_directory_is_removed_after_a_timeout() {
+    let d = TempDir::new().unwrap();
+    let tmpdir = d.path().join("tmp");
+    std::fs::create_dir(&tmpdir).unwrap();
+    let conv = script(d.path(), "fake-inkscape", "sleep 30");
+    let input = emf(d.path(), "a.emf");
+    pixctl()
+        .env("TMPDIR", &tmpdir)
+        .env("PIXCTL_CONVERTER", &conv)
+        .env("PIXCTL_CONVERT_TIMEOUT_SECS", "1")
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .code(2);
+    let left: Vec<_> = std::fs::read_dir(&tmpdir).unwrap().collect();
+    assert!(left.is_empty(), "{left:?}");
+}
+
+#[test]
+fn a_grandchild_process_is_killed_with_the_group() {
+    let d = TempDir::new().unwrap();
+    let marker = d.path().join("alive");
+    // The grandchild writes the marker after 3 s, unless it is killed first.
+    let conv = script(
+        d.path(),
+        "fake-inkscape",
+        &format!("(sleep 3; touch '{}') &\nsleep 30", marker.display()),
+    );
+    let input = emf(d.path(), "a.emf");
+    pixctl()
+        .env("PIXCTL_CONVERTER", &conv)
+        .env("PIXCTL_CONVERT_TIMEOUT_SECS", "1")
+        .arg("inspect")
+        .arg(&input)
+        .assert()
+        .code(2);
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    assert!(!marker.exists());
+}
+
+/// Runs the real Inkscape from `PATH` on `fixtures/rect.wmf`. It is ignored by
+/// default; `just test-converter` runs it, and the `converter` CI job installs
+/// Inkscape first.
+///
+/// `fixtures/rect.wmf` (110 bytes) was built by hand from the WMF
+/// specification (MS-WMF): a 22-byte placeable header (bounding box 200x100 at
+/// 96 units per inch), the 18-byte metafile header, then the records
+/// SetMapMode, SetWindowOrg, SetWindowExt, CreateBrushIndirect, SelectObject,
+/// Rectangle and EOF.
+#[test]
+#[ignore = "needs Inkscape on PATH; run with `just test-converter`"]
+fn converter_real_inkscape_converts_a_wmf() {
+    let input = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rect.wmf");
+    let mut c = Command::cargo_bin("pixctl").unwrap();
+    let out = c
+        .env_remove("PIXCTL_CONVERTER")
+        .env_remove("PIXCTL_CONVERT_TIMEOUT_SECS")
+        .args(["inspect", "--json"])
+        .arg(&input)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let r = &json(&out)["results"][0];
+    assert!(r["width"].as_u64().unwrap() > 0);
+    assert!(r["height"].as_u64().unwrap() > 0);
+    assert_eq!(r["converter"], "inkscape");
+}

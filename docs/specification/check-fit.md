@@ -98,8 +98,7 @@ A docs author, or CI, can turn a raster image into a display-correct PNG or WebP
 
 ## Deferred
 
-EMF/WMF input, and the public corpus with `just eval` are follow-ups and are not
-built.
+The public corpus with `just eval` is a follow-up and is not built.
 
 ## Alternatives considered
 

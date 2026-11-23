@@ -17,8 +17,10 @@ with the code it returns).
 - `cli.rs` — `clap` definitions of the commands and their arguments.
 - `contract.rs` — constants of the display contract (column, font, padding,
   frame, icon size) and its version.
-- `load.rs` — decodes an image file to RGBA8, detects transparent pixels and
-  flattens an image to greyscale.
+- `convert.rs` — converts EMF and WMF files to PNG through Inkscape or
+  LibreOffice, with a time limit.
+- `load.rs` — decodes an image file to RGBA8 (EMF/WMF through `convert.rs`),
+  detects transparent pixels and flattens an image to greyscale.
 - `font.rs` — estimates the font size from the heights of the text lines.
 - `rule.rs` — chooses the fit rule, scale factor and output width.
 - `output.rs` — the JSON envelope, the coded `Failure` error, colour and counts.
@@ -42,6 +44,11 @@ just build      # full local gate (toolchain, prim, fmt, compile, test, clippy, 
 just verify     # commit-message lint + full gate — run before opening a PR
 just release    # git-std bump (changelog + tag) on a clean, CI-green main
 ```
+
+`just test-converter` runs the ignored test that needs a real Inkscape, and
+fails when it does not run; the `converter` CI job installs Inkscape and runs
+it. The WMF fixture `tests/fixtures/rect.wmf` was built by hand from the WMF
+specification (see the comment in `tests/convert.rs`).
 
 CI (`.github/workflows/ci.yml`) runs only `just` recipes. Releases are built by
 cargo-dist (`release.yml`) on a `v*` tag.

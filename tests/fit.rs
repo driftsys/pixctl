@@ -499,7 +499,19 @@ fn json_mixed_run_has_results_and_coded_errors() {
     let emf = dir.path().join("x.emf");
     std::fs::write(&emf, b"x").unwrap();
     let out = dir.path().join("out");
-    let (code, doc, stderr) = fit_json(&[&corrupt, &emf, &good], &out);
+    // No converter may be found, so `x.emf` fails with `unsupported_type`.
+    let empty = TempDir::new().unwrap();
+    let res = pixctl()
+        .env_remove("PIXCTL_CONVERTER")
+        .env("PATH", empty.path())
+        .args(["fit", "--json", "--out"])
+        .arg(&out)
+        .args([&corrupt, &emf, &good])
+        .output()
+        .unwrap();
+    let doc: serde_json::Value =
+        serde_json::from_slice(&res.stdout).expect("stdout is one JSON document");
+    let (code, stderr) = (res.status.code(), String::from_utf8(res.stderr).unwrap());
     assert_eq!(code, Some(2));
     assert_eq!(doc["results"].as_array().unwrap().len(), 1);
     assert_eq!(doc["summary"]["written"], 1);
