@@ -90,22 +90,32 @@ fn labelled(dir: &Path, manifest: &Path) -> Result<(String, bool), EvalError> {
     let mut samples = Vec::with_capacity(entries.len());
     for (i, entry) in entries.iter().enumerate() {
         let cannot_read = EvalError::CannotReadImage { index: i + 1 };
-        let loaded = load(&dir.join(&entry.file)).map_err(|_| cannot_read)?;
-        let est = estimate(&flatten_to_gray(&loaded.rgba));
-        samples.push(Sample {
-            label_px: entry.label_px,
-            est_px: est.px,
-            confident: est.confidence == Confidence::High && est.px.is_some(),
-        });
+        // A panic in a decoder is the same operational error as a load failure.
+        let sample = survey::guarded(|| measure(&dir.join(&entry.file), entry.label_px))
+            .and_then(Result::ok)
+            .ok_or(cannot_read)?;
+        samples.push(sample);
     }
     let acc = accuracy(&samples);
     let ki = k_interval(&samples, K);
     Ok(metrics::report(&acc, &ki, K))
 }
 
+/// Estimates the font size of one labelled image. A load failure is `Err`.
+fn measure(path: &Path, label_px: f32) -> Result<Sample, ()> {
+    let loaded = load(path).map_err(|_| ())?;
+    let est = estimate(&flatten_to_gray(&loaded.rgba));
+    Ok(Sample {
+        label_px,
+        est_px: est.px,
+        confident: est.confidence == Confidence::High && est.px.is_some(),
+    })
+}
+
 fn main() {
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
-    // A panic message names a source path; the survey counts panics instead.
+    // A panic message names a source path. Both modes catch a panic with
+    // `survey::guarded` and report a fixed text instead.
     std::panic::set_hook(Box::new(|_| {}));
     let code = run(&args, &mut std::io::stdout(), &mut std::io::stderr());
     std::process::exit(code);
@@ -242,6 +252,15 @@ mod tests {
             assert!(!text.contains("png"));
             assert!(!text.contains(&root));
         }
+    }
+
+    #[test]
+    fn panic_in_labelled_work_is_cannot_read_image() {
+        // The same helper and mapping as in `labelled`, with a panicking body.
+        let got = survey::guarded(|| -> Result<Sample, ()> { panic!("decoder bug") })
+            .and_then(Result::ok)
+            .ok_or(EvalError::CannotReadImage { index: 1 });
+        assert_eq!(got.unwrap_err().to_string(), "entry 1: cannot read image");
     }
 
     #[test]

@@ -81,7 +81,10 @@ pub fn run(paths: &[PathBuf], progress: &mut impl Write) -> Survey {
     let total = paths.len();
     let mut done = 0;
     for chunk in paths.chunks(CHUNK) {
-        let outcomes: Vec<Outcome> = chunk.par_iter().map(|p| guarded(|| measure(p))).collect();
+        let outcomes: Vec<Outcome> = chunk
+            .par_iter()
+            .map(|p| guarded(|| measure(p)).unwrap_or(Outcome::Failed("panicked")))
+            .collect();
         for outcome in outcomes {
             s.images += 1;
             match outcome {
@@ -102,10 +105,10 @@ pub fn run(paths: &[PathBuf], progress: &mut impl Write) -> Survey {
     s
 }
 
-/// Runs `f`; a panic inside it (for example in a decoder) becomes the failure
-/// code `panicked`, so one image cannot stop the survey.
-fn guarded(f: impl FnOnce() -> Outcome) -> Outcome {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or(Outcome::Failed("panicked"))
+/// Runs `f` and returns `None` when it panics (for example in a decoder), so
+/// one image cannot stop the run. The caller maps `None` to its own failure.
+pub fn guarded<T>(f: impl FnOnce() -> T) -> Option<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).ok()
 }
 
 fn measure(path: &Path) -> Outcome {
@@ -218,6 +221,7 @@ mod tests {
         assert_eq!(s.images, 3);
         assert_eq!(s.confident, 1);
         assert_eq!(s.rules[0], 1);
+        assert_eq!(s.rules.iter().sum::<usize>(), 2);
         assert_eq!(s.failed["read_failed"], 1);
         assert_eq!(String::from_utf8(progress).unwrap(), "\r3/3\n");
     }
@@ -239,8 +243,10 @@ mod tests {
 
     #[test]
     fn panicking_image_is_counted_as_failed() {
-        let outcome = guarded(|| panic!("decoder bug"));
-        assert!(matches!(outcome, Outcome::Failed("panicked")));
+        let outcome = guarded(|| -> Outcome { panic!("decoder bug") });
+        assert!(outcome.is_none());
+        let outcome = guarded(|| measure(Path::new("/nonexistent/x.png")));
+        assert!(matches!(outcome, Some(Outcome::Failed(_))));
     }
 
     #[test]

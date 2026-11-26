@@ -120,6 +120,7 @@ pub fn report(a: &Accuracy, ki: &KInterval, k: f32) -> (String, bool) {
             };
             format!("{head}{lo:.3}–{hi:.3} (current K {k:.3}, {place})")
         }
+        None if ki.used == 0 => format!("{head}none (no image has an estimate)"),
         None => format!("{head}none (no single K fits)"),
     };
     (format!("{line1}\n{line2}\n{line3}\n{line4}"), met)
@@ -237,6 +238,13 @@ mod tests {
         let (text, _) = report(&acc(0, 2), &ki, 1.045);
         assert!(text.contains("none (no single K fits)"));
         assert!(text.contains("(n = 2)"));
+    }
+
+    #[test]
+    fn k_interval_without_estimates_prints_its_own_none() {
+        let (text, _) = report(&acc(0, 0), &NONE, 1.045);
+        assert!(text.contains("(n = 0): none (no image has an estimate)"));
+        assert!(!text.contains("no single K fits"));
     }
 
     #[test]

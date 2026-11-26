@@ -609,7 +609,7 @@ ignored. A manifest with no entry is an error.
 The tool estimates the font size of every labelled image and prints four lines:
 
 ```console
-$ just eval /private/tmp/pixctl-eval-scratch /private/tmp/pixctl-eval-scratch/manifest.toml
+$ just eval ~/shots ~/shots-labels.toml
 images: 4 (confident 4, review 0 = 0.0 %)
 error on confident: mean 0.6 px, p95 0.7 px
 confidently wrong (> 2 px): 0 of 4 = 0.0 % (limit 2 %)  PASS
@@ -622,10 +622,12 @@ K interval for ±1.5 px on all labelled images (n = 4): 0.906–1.094 (current K
   from the label by more than 2 px. The limit is that fewer than 2 % of the
   confident images are confidently wrong; 1 of 50 is exactly 2 % and fails.
 - The `K` line gives the range of the calibration constant `K` for which every
-  labelled image has an error of at most 1.5 px, and whether the current `K`
-  (see [AD-0011](docs/decisions/0011-k-calibration-rule.md)) is `inside` or
-  `outside` that range. It reads `none (no single K fits)` when no value of `K`
-  fits all images.
+  labelled image that has an estimate has an error of at most 1.5 px, and
+  whether the current `K` (see
+  [AD-0011](docs/decisions/0011-k-calibration-rule.md)) is `inside` or `outside`
+  that range. `n` is the number of images that have an estimate. The range reads
+  `none (no single K fits)` when no value of `K` fits all of those images, and
+  `none (no image has an estimate)` when `n` is 0.
 - When no image is confident, the error line and the wrong line print `n/a`, and
   the wrong line ends with `FAIL`.
 
@@ -651,7 +653,7 @@ under each fit rule. The progress count `done/total` goes to stderr, and the
 report goes to stdout:
 
 ```console
-$ just eval /private/tmp/pixctl-eval-scratch
+$ just eval ~/shots
 5/5
 images: 5 (skipped SVG: 1)
 confident: 4 (80.0 %)
