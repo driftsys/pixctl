@@ -5,5 +5,7 @@
 mod error;
 #[allow(dead_code)]
 mod manifest;
+#[allow(dead_code)]
+mod metrics;
 
 fn main() {}
