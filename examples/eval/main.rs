@@ -105,6 +105,8 @@ fn labelled(dir: &Path, manifest: &Path) -> Result<(String, bool), EvalError> {
 
 fn main() {
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
+    // A panic message names a source path; the survey counts panics instead.
+    std::panic::set_hook(Box::new(|_| {}));
     let code = run(&args, &mut std::io::stdout(), &mut std::io::stderr());
     std::process::exit(code);
 }

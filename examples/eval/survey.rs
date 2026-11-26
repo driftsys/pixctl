@@ -81,7 +81,7 @@ pub fn run(paths: &[PathBuf], progress: &mut impl Write) -> Survey {
     let total = paths.len();
     let mut done = 0;
     for chunk in paths.chunks(CHUNK) {
-        let outcomes: Vec<Outcome> = chunk.par_iter().map(|p| measure(p)).collect();
+        let outcomes: Vec<Outcome> = chunk.par_iter().map(|p| guarded(|| measure(p))).collect();
         for outcome in outcomes {
             s.images += 1;
             match outcome {
@@ -100,6 +100,12 @@ pub fn run(paths: &[PathBuf], progress: &mut impl Write) -> Survey {
     }
     let _ = writeln!(progress);
     s
+}
+
+/// Runs `f`; a panic inside it (for example in a decoder) becomes the failure
+/// code `panicked`, so one image cannot stop the survey.
+fn guarded(f: impl FnOnce() -> Outcome) -> Outcome {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or(Outcome::Failed("panicked"))
 }
 
 fn measure(path: &Path) -> Outcome {
@@ -229,6 +235,12 @@ mod tests {
         let mut progress = Vec::new();
         run(&paths, &mut progress);
         assert_eq!(String::from_utf8(progress).unwrap(), "\r100/150\r150/150\n");
+    }
+
+    #[test]
+    fn panicking_image_is_counted_as_failed() {
+        let outcome = guarded(|| panic!("decoder bug"));
+        assert!(matches!(outcome, Outcome::Failed("panicked")));
     }
 
     #[test]
