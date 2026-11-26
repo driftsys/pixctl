@@ -15,6 +15,7 @@ exclude = [
   "tests/font_accuracy.rs",
   "tests/inspect.rs",
   "tests/support_selftest.rs",
+  "examples",
 ]
 
 [dependencies]
@@ -38,6 +39,14 @@ tempfile = "3"
 ab_glyph = "0.2"
 assert_cmd = "2"
 predicates = "3"
+toml = "0.8"
+rayon = "1"
+
+# Private evaluation tool, run by 'just eval'; it is not published.
+[[example]]
+name = "eval"
+path = "examples/eval/main.rs"
+test = true
 
 # The profile that 'dist' will build with
 [profile.dist]
