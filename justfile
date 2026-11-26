@@ -84,6 +84,10 @@ lint-commits base="main":
 # The full local gate.
 build: toolchain-check check fmt-check compile test lint shellcheck install-test
 
+# Private font-size evaluation of a folder of images; prints totals only.
+eval DIR *MANIFEST:
+    @cargo run --quiet --release --locked --example eval -- {{DIR}} {{MANIFEST}}
+
 # Fast gate run by the pre-push hook.
 pre-push: lint-commits toolchain-check check fmt-check lint
 
