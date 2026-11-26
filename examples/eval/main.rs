@@ -5,6 +5,7 @@
 mod error;
 mod manifest;
 mod metrics;
+mod survey;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -31,9 +32,15 @@ fn run(args: &[OsString], out: &mut impl Write, err: &mut impl Write) -> i32 {
         Err(e) => return fail(err, &e),
     }
     let Some(manifest) = args.get(1).map(Path::new) else {
-        // The survey of a folder without a manifest comes with a later task.
-        let _ = writeln!(err, "{USAGE}");
-        return 2;
+        return match survey::collect(dir) {
+            Ok((paths, skipped_svg)) => {
+                let mut s = survey::run(&paths, err);
+                s.skipped_svg = skipped_svg;
+                let _ = writeln!(out, "{}", survey::report(&s));
+                0
+            }
+            Err(e) => fail(err, &e),
+        };
     };
     match labelled(dir, manifest) {
         Ok((text, met)) => {
@@ -222,11 +229,17 @@ mod tests {
     }
 
     #[test]
-    fn dir_without_manifest_prints_usage_and_exits_2() {
-        let (dir, _) = fixture(1, 14.0);
-        let (code, _, err) = go(&[dir.path().into()]);
-        assert_eq!(code, 2);
-        assert_eq!(err, "usage: just eval DIR [MANIFEST]\n");
+    fn run_without_manifest_surveys_and_exits_0() {
+        let (dir, _) = fixture(2, 14.0);
+        let (code, out, err) = go(&[dir.path().into()]);
+        assert_eq!(code, 0, "out: {out} err: {err}");
+        assert!(out.contains("images: 2 (skipped SVG: 0)"), "{out}");
+        assert_eq!(err, "\r2/2\n");
+        let root = dir.path().to_string_lossy().into_owned();
+        for text in [&out, &err] {
+            assert!(!text.contains("png"));
+            assert!(!text.contains(&root));
+        }
     }
 
     #[test]
