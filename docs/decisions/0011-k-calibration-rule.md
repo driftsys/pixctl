@@ -22,6 +22,7 @@ is kept in the `K` doc comment in [`src/font.rs`](../../src/font.rs).
 ## Consequences
 
 `K` is fitted to three synthetic faces. It must be rechecked on a real corpus,
-which is not yet available, and may need recalibration.
+and may need recalibration. `just eval` measures the `K` interval on a private
+folder ([AD-0017](0017-eval-is-a-private-cargo-example.md)).
 
 Satisfies: [AD-0001](0001-font-estimate-heuristic.md)
