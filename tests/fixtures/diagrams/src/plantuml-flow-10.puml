@@ -1,0 +1,16 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 10
+skinparam dpi 96
+skinparam shadowing false
+skinparam titleFontName Noto Sans
+skinparam titleFontSize 13
+title Flow overview
+start
+:Receive input;
+:Validate fields;
+:Apply policy;
+:Prepare result;
+:Notify client;
+stop
+@enduml

@@ -1,0 +1,10 @@
+direction: down
+header: Architecture overview {shape: text; style.font-size: 16}
+a: "Read input\nValidate fields\nRecord request" {style.font-size: 13}
+b: "Prepare data\nApply policy\nStore result" {style.font-size: 13}
+c: "Review output\nNotify client\nClose request" {style.font-size: 13}
+d: Status {style.font-size: 13}
+a -> b: accepted {style.font-size: 13}
+b -> c: processed {style.font-size: 13}
+c -> d: complete {style.font-size: 13}
+legend: "Legend: normal path" {shape: text; style.font-size: 11}

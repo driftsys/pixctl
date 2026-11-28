@@ -8,9 +8,12 @@ repository = "https://github.com/driftsys/pixctl"
 readme = "README.md"
 keywords = ["cli", "image", "png", "markdown", "documentation"]
 categories = ["command-line-utilities"]
-# The tests that render text need the fonts, which are not published.
+# The test fonts, the diagram corpus and the tests and generators that use them
+# are not published.
 exclude = [
   "tests/fonts",
+  "tests/fixtures/diagrams",
+  "tests/diagram_corpus.rs",
   "tests/support",
   "tests/font_accuracy.rs",
   "tests/inspect.rs",

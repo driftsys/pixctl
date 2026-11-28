@@ -1,0 +1,5 @@
+digraph {
+  graph [dpi=96, margin=0, pad=0];
+  node [shape=plain, fontname="Noto Sans", fontsize=75];
+  x [label="HHHHHHHH"];
+}

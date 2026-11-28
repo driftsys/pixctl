@@ -1,0 +1,10 @@
+direction: right
+header: State overview {shape: text; style.font-size: 23}
+a: "Read input\nValidate fields\nRecord request" {shape: oval; style.font-size: 20}
+b: "Prepare data\nApply policy\nStore result" {shape: oval; style.font-size: 20}
+c: "Review output\nNotify client\nClose request" {shape: oval; style.font-size: 20}
+d: Status {shape: oval; style.font-size: 20}
+a -> b: accepted { style.font-size: 20}
+b -> c: processed { style.font-size: 20}
+c -> d: complete { style.font-size: 20}
+legend: "Legend: normal path" {shape: text; style.font-size: 18}

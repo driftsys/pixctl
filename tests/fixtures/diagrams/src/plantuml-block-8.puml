@@ -1,0 +1,15 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 8
+skinparam dpi 96
+skinparam shadowing false
+skinparam titleFontName Noto Sans
+skinparam titleFontSize 11
+title Block overview
+component "Input service\nValidate fields\nRecord request" as A
+component "Policy service\nApply policy\nPrepare result" as B
+component "Output service\nStore result\nNotify client" as C
+A --> B: accepted
+B --> C: processed
+C --> A: complete
+@enduml

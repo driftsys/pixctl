@@ -1,0 +1,11 @@
+digraph G {
+ graph [dpi=96, fontname="Noto Sans", fontsize=9.75, labelloc=t, label="State overview"];
+ node [shape=ellipse, fontname="Noto Sans", fontsize=7.5];
+ edge [fontname="Noto Sans", fontsize=7.5];
+ a [label="Read input\nValidate fields\nRecord request"];
+ b [label="Prepare data\nApply policy\nStore result"];
+ c [label="Review output\nNotify client\nClose request"];
+ d [label="Status"];
+ a -> b [label="accepted"]; b -> c [label="processed"]; c -> d [label="complete"];
+ note [shape=note, fontsize=6.0, label="Legend: normal path"];
+}

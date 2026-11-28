@@ -33,6 +33,9 @@ with the code it returns).
 - `fit.rs` — renders an image to the display contract and encodes the PNG or
   WebP.
 - `fit_cmd.rs` — the `fit` command: writes one fitted PNG or WebP per input.
+- `tests/fixtures/diagrams/` — public corpus of diagram images with exact
+  font-size labels (`render.sh` regenerates it, `calibration/` checks the
+  labels).
 - `examples/eval/` — private Cargo example run by `just eval`: scores the font
   estimate on a labelled folder or surveys an unlabelled one, and prints totals
   only. Not part of the released binary.
@@ -45,6 +48,7 @@ just            # list recipes
 just fmt        # prim + cargo fmt, in place
 just build      # full local gate (toolchain, prim, fmt, compile, test, clippy, shellcheck, install test)
 just verify     # commit-message lint + full gate — run before opening a PR
+just corpus  # re-render the diagram corpus (macOS, Homebrew tools); CI does not run it
 just eval DIR [MANIFEST]  # private font-estimate evaluation of a folder outside the repo; totals only
 just release    # git-std bump (changelog + tag) on a clean, CI-green main
 ```

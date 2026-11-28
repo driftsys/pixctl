@@ -28,7 +28,9 @@ a separate change with its own record. Details are in
 ## Consequences
 
 Running the evaluation needs a Rust toolchain and a checkout. The release build
-gains no dependency. A public corpus with a CI gate stays open as issue #9.
+gains no dependency. A public diagram corpus with exact labels exists in
+`tests/fixtures/diagrams` (no accuracy gate yet); the open-licence set of real
+screenshots in issue #9 is still open.
 
 Partially satisfies: [pixctl#9](https://github.com/driftsys/pixctl/issues/9);
-the public corpus stays open there.
+the open-licence real-screenshot set stays open there.

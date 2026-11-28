@@ -1,7 +1,7 @@
 # Test fonts
 
-Fonts used only by the synthetic text fixture generator in `tests/support`. They
-are excluded from the published crate package.
+Fonts used by the synthetic text fixture generator in `tests/support` and by
+`tests/fixtures/diagrams` (`render.sh` and the calibration). They are excluded from the published crate package.
 
 | File                         | Version | Source                                                                                                                             | Licence                          | sha256                                                             |
 | ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------ |

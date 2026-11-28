@@ -1,0 +1,10 @@
+direction: right
+header: Block overview {shape: text; style.font-size: 14}
+a: "Read input\nValidate fields\nRecord request" {style.font-size: 11}
+b: "Prepare data\nApply policy\nStore result" {style.font-size: 11}
+c: "Review output\nNotify client\nClose request" {style.font-size: 11}
+d: Status {style.font-size: 11}
+a -> b: accepted {style.font-size: 11}
+b -> c: processed {style.font-size: 11}
+c -> d: complete {style.font-size: 11}
+legend: "Legend: normal path" {shape: text; style.font-size: 9}

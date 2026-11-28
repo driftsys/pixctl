@@ -1,0 +1,5 @@
+digraph G {
+ graph [dpi=96, fontname="Noto Sans", fontsize=8.25, labelloc=t, label="Short flow"];
+ node [shape=box, fontname="Noto Sans", fontsize=6.0];
+ a [label="Read"]; b [label="Write"]; a -> b;
+}

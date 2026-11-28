@@ -1,0 +1,9 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 100
+skinparam dpi 96
+skinparam activityBorderColor transparent
+skinparam activityBackgroundColor transparent
+skinparam shadowing false
+:HHHHHHHH;
+@enduml
