@@ -77,6 +77,15 @@ pub fn collect(dir: &Path) -> Result<(Vec<PathBuf>, usize), EvalError> {
 /// end it writes `\r{done}/{total}` to `progress`, then a newline. The
 /// progress is a count only.
 pub fn run(paths: &[PathBuf], progress: &mut impl Write) -> Survey {
+    run_with(paths, progress, measure)
+}
+
+/// `run` with the per-image function injected.
+fn run_with(
+    paths: &[PathBuf],
+    progress: &mut impl Write,
+    measure: impl Fn(&Path) -> Outcome + Sync,
+) -> Survey {
     let mut s = Survey::default();
     let total = paths.len();
     let mut done = 0;
@@ -243,10 +252,34 @@ mod tests {
 
     #[test]
     fn panicking_image_is_counted_as_failed() {
-        let outcome = guarded(|| -> Outcome { panic!("decoder bug") });
-        assert!(outcome.is_none());
-        let outcome = guarded(|| measure(Path::new("/nonexistent/x.png")));
-        assert!(matches!(outcome, Some(Outcome::Failed(_))));
+        let paths = vec![PathBuf::from("a.png"), PathBuf::from("b.png")];
+        let s = run_with(&paths, &mut Vec::new(), |p| {
+            if p == Path::new("a.png") {
+                panic!("decoder bug")
+            }
+            Outcome::Measured {
+                confident: true,
+                rule: 1,
+            }
+        });
+        assert_eq!(s.images, 2);
+        assert_eq!(s.failed["panicked"], 1);
+        assert_eq!(s.failed.len(), 1);
+        assert_eq!(s.confident, 1);
+    }
+
+    #[test]
+    fn rules_land_in_their_own_counters() {
+        let dir = TempDir::new().unwrap();
+        for (name, w, h) in [("icon", 32, 32), ("plain", 300, 200), ("wide", 800, 100)] {
+            image::RgbaImage::new(w, h)
+                .save(dir.path().join(format!("{name}.png")))
+                .unwrap();
+        }
+        let (paths, _) = collect(dir.path()).unwrap();
+        let s = run(&paths, &mut Vec::new());
+        // icon, unchanged, upscale, too-small, oversize.
+        assert_eq!(s.rules, [1, 1, 0, 0, 1]);
     }
 
     #[test]

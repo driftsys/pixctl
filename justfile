@@ -85,8 +85,9 @@ lint-commits base="main":
 build: toolchain-check check fmt-check compile test lint shellcheck install-test
 
 # Private font-size evaluation of a folder of images; prints totals only.
+[no-cd]
 eval DIR MANIFEST="":
-    @cargo run --quiet --release --locked --example eval -- {{quote(DIR)}} {{if MANIFEST == "" { "" } else { quote(MANIFEST) } }}
+    @cargo run --quiet --release --locked --manifest-path {{quote(justfile_directory() / "Cargo.toml")}} --example eval -- {{quote(DIR)}} {{if MANIFEST == "" { "" } else { quote(MANIFEST) } }}
 
 # Fast gate run by the pre-push hook.
 pre-push: lint-commits toolchain-check check fmt-check lint

@@ -30,4 +30,5 @@ a separate change with its own record. Details are in
 Running the evaluation needs a Rust toolchain and a checkout. The release build
 gains no dependency. A public corpus with a CI gate stays open as issue #9.
 
-Satisfies: [pixctl#9](https://github.com/driftsys/pixctl/issues/9)
+Partially satisfies: [pixctl#9](https://github.com/driftsys/pixctl/issues/9);
+the public corpus stays open there.

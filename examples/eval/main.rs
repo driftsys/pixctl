@@ -22,6 +22,26 @@ const USAGE: &str = "usage: just eval DIR [MANIFEST]";
 /// Runs the tool and returns the exit code: 0 limit met, 1 limit not met,
 /// 2 operational error.
 fn run(args: &[OsString], out: &mut impl Write, err: &mut impl Write) -> i32 {
+    run_with(args, out, err, measure)
+}
+
+/// Writes the report. A write error is an operational error: the text is
+/// fixed and carries no path.
+fn emit(out: &mut impl Write, err: &mut impl Write, text: &str) -> bool {
+    if writeln!(out, "{text}").is_ok() {
+        return true;
+    }
+    let _ = writeln!(err, "pixctl eval: cannot write the report");
+    false
+}
+
+/// `run` with the measure of one labelled image injected.
+fn run_with(
+    args: &[OsString],
+    out: &mut impl Write,
+    err: &mut impl Write,
+    measure: impl Fn(&Path, f32) -> Result<Sample, ()>,
+) -> i32 {
     let Some(dir) = args.first().map(Path::new) else {
         let _ = writeln!(err, "{USAGE}");
         return 2;
@@ -36,16 +56,20 @@ fn run(args: &[OsString], out: &mut impl Write, err: &mut impl Write) -> i32 {
             Ok((paths, skipped_svg)) => {
                 let mut s = survey::run(&paths, err);
                 s.skipped_svg = skipped_svg;
-                let _ = writeln!(out, "{}", survey::report(&s));
-                0
+                if emit(out, err, &survey::report(&s)) {
+                    0
+                } else {
+                    2
+                }
             }
             Err(e) => fail(err, &e),
         };
     };
-    match labelled(dir, manifest) {
+    match labelled(dir, manifest, measure) {
         Ok((text, met)) => {
-            let _ = writeln!(out, "{text}");
-            if met {
+            if !emit(out, err, &text) {
+                2
+            } else if met {
                 0
             } else {
                 1
@@ -84,7 +108,11 @@ fn inside_repository(dir: &Path) -> bool {
 }
 
 /// Measures every labelled image and returns the report and the verdict.
-fn labelled(dir: &Path, manifest: &Path) -> Result<(String, bool), EvalError> {
+fn labelled(
+    dir: &Path,
+    manifest: &Path,
+    measure: impl Fn(&Path, f32) -> Result<Sample, ()>,
+) -> Result<(String, bool), EvalError> {
     let text = std::fs::read_to_string(manifest).map_err(|_| EvalError::CannotReadManifest)?;
     let entries = manifest::parse(&text)?;
     let mut samples = Vec::with_capacity(entries.len());
@@ -256,11 +284,99 @@ mod tests {
 
     #[test]
     fn panic_in_labelled_work_is_cannot_read_image() {
-        // The same helper and mapping as in `labelled`, with a panicking body.
-        let got = survey::guarded(|| -> Result<Sample, ()> { panic!("decoder bug") })
-            .and_then(Result::ok)
-            .ok_or(EvalError::CannotReadImage { index: 1 });
-        assert_eq!(got.unwrap_err().to_string(), "entry 1: cannot read image");
+        let (dir, manifest) = fixture(1, 14.0);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run_with(
+            &[dir.path().into(), manifest],
+            &mut out,
+            &mut err,
+            |_, _| panic!("decoder bug"),
+        );
+        assert_eq!(code, 2);
+        assert!(out.is_empty());
+        assert_eq!(
+            String::from_utf8(err).unwrap(),
+            "pixctl eval: entry 1: cannot read image\n"
+        );
+    }
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("closed"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::Error::other("closed"))
+        }
+    }
+
+    #[test]
+    fn a_failed_report_write_exits_2_in_both_modes() {
+        let (dir, manifest) = fixture(2, 14.0);
+        for args in [vec![dir.path().into(), manifest], vec![dir.path().into()]] {
+            let mut err = Vec::new();
+            let code = run(&args, &mut FailingWriter, &mut err);
+            assert_eq!(code, 2);
+            assert_eq!(
+                String::from_utf8(err).unwrap().lines().last(),
+                Some("pixctl eval: cannot write the report")
+            );
+        }
+    }
+
+    #[test]
+    fn survey_mode_also_refuses_a_dir_inside_the_repository() {
+        let (code, out, err) = go(&[env!("CARGO_MANIFEST_DIR").into()]);
+        assert_eq!(code, 2);
+        assert_eq!(out, "");
+        assert_eq!(
+            err,
+            format!("pixctl eval: {}\n", error::EvalError::DirInsideRepository)
+        );
+    }
+
+    #[test]
+    fn manifest_files_are_relative_to_dir_not_to_the_manifest() {
+        let (dir, manifest) = fixture(2, 14.0);
+        let elsewhere = TempDir::new().unwrap();
+        let moved = elsewhere.path().join("labels.toml");
+        fs::copy(&manifest, &moved).unwrap();
+        let (code, out, err) = go(&[dir.path().into(), moved.into()]);
+        assert_eq!(code, 0, "out: {out} err: {err}");
+        assert!(out.contains("images: 2"), "{out}");
+    }
+
+    #[test]
+    fn a_low_confidence_estimate_is_counted_as_review() {
+        let (dir, manifest) = fixture(1, 14.0);
+        // Two lines of text give an estimate with low confidence.
+        render_text(&TextSpec {
+            face: Face::DejaVu,
+            em_px: 14.0,
+            lines: 2,
+            invert: false,
+        })
+        .save(dir.path().join("short.png"))
+        .unwrap();
+        let mut text = fs::read_to_string(&manifest).unwrap();
+        text.push_str("[[image]]\nfile = \"short.png\"\npx = 14.0\n");
+        fs::write(&manifest, text).unwrap();
+        let (code, out, err) = go(&[dir.path().into(), manifest]);
+        assert_eq!(code, 0, "out: {out} err: {err}");
+        assert!(
+            out.contains("images: 2 (confident 1, review 1 = 50.0 %)"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn survey_reports_skipped_svg_files() {
+        let (dir, _) = fixture(1, 14.0);
+        fs::write(dir.path().join("logo.svg"), b"<svg/>").unwrap();
+        let (code, out, _) = go(&[dir.path().into()]);
+        assert_eq!(code, 0);
+        assert!(out.contains("images: 1 (skipped SVG: 1)"), "{out}");
     }
 
     #[test]

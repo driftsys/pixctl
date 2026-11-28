@@ -184,6 +184,10 @@ mod tests {
     fn p95_is_nearest_rank() {
         let samples: Vec<Sample> = (1..=20).map(|i| s(100.0, 100.0 + i as f32)).collect();
         assert_eq!(accuracy(&samples).p95, Some(19.0));
+        // n = 21: ceil(19.95) = 20, so the 20th smallest error. The input is
+        // not sorted: the largest errors come first.
+        let unsorted: Vec<Sample> = (1..=21).rev().map(|i| s(100.0, 100.0 + i as f32)).collect();
+        assert_eq!(accuracy(&unsorted).p95, Some(20.0));
     }
 
     #[test]
@@ -216,6 +220,27 @@ mod tests {
         let (lo, hi) = ki.range.unwrap();
         assert_eq!(ki.used, 2);
         assert_eq!(format!("{lo:.3} {hi:.3}"), "0.950 1.050");
+    }
+
+    #[test]
+    fn k_interval_keeps_the_tighter_upper_bound_when_it_comes_first() {
+        // h = 30 gives 0.95–1.05 and is first; h = 15 gives 0.9–1.1.
+        let ki = k_interval(&[s(30.0, 31.35), s(15.0, 15.675)], 1.045);
+        let (lo, hi) = ki.range.unwrap();
+        assert_eq!(format!("{lo:.3} {hi:.3}"), "0.950 1.050");
+    }
+
+    #[test]
+    fn k_interval_uses_samples_that_are_not_confident() {
+        let review = Sample {
+            label_px: 15.0,
+            est_px: Some(30.0),
+            confident: false,
+        };
+        // The review sample alone allows 0.47–0.57, so no K fits both.
+        let ki = k_interval(&[s(15.0, 15.675), review], 1.045);
+        assert_eq!(ki.used, 2);
+        assert_eq!(ki.range, None);
     }
 
     #[test]
