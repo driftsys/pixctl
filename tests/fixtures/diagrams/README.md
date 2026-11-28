@@ -9,8 +9,8 @@ titles and legends. The body text is the majority of the text lines. The body
 sizes are 8, 10, 11, 12, 13, 14, 16 and 20 px. Variant labels are multiplied
 by 0.75 for the reduced images and unchanged for JPEGs.
 
-Run `just corpus` on macOS with Graphviz, PlantUML, D2, Java, librsvg,
-ImageMagick, Homebrew and shellcheck installed. The script isolates fontconfig
+Run `just corpus` on macOS with Graphviz, PlantUML, D2, librsvg, ImageMagick,
+Homebrew and a Java JDK (javac) installed. The script isolates fontconfig
 and registers the bundled Noto Sans font with Java. D2 produces SVG, and
 librsvg rasterizes it at one output pixel per SVG pixel; the script replaces
 D2's embedded font names with the same local font for librsvg. ImageMagick
@@ -26,26 +26,29 @@ are excluded from the published crate.
 
 ## Font size calibration
 
-The `calibration/` directory contains the sources of the single-line `HHHHHHHH` samples; render them by hand with the same tool settings as `render.sh`. The
-font's OS/2 `sCapHeight` is 714 and `head.unitsPerEm` is 1000, as printed by
-`python3 tests/fixtures/diagrams/calibration/font_metrics.py`. Its cap-height
-ratio is therefore 0.714. Each sample was rendered using the same font and
-output path as the corpus, then converted to greyscale and thresholded at 50%.
-The capital H occupies 10 dark pixel rows in each PNG. At the target em size
-of 14 px, the font metrics predict 9.996 px; the measured 10 rows imply
-10 / 0.714 = 14.006 px. This is within 0.3 px of the label. Pixel-row counts
-are quantized; this measurement verifies the mapping at the calibration size,
-not a separate subpixel measurement at every size.
+The labels give the em size in pixels. The calibration shows that each tool
+setting in `render.sh` produces that em size. `calibration/calibrate.sh`
+renders the sources in `calibration/` (a single line `HHHHHHHH`) at a nominal
+em of 100 px with the same font and pipeline as `render.sh`: Graphviz
+`fontsize` 75 pt at `dpi=96`, PlantUML `defaultFontSize` 100, and D2
+`style.font-size` 100. It flattens each PNG on white, thresholds it at 50 %,
+and counts the rows of dark pixels, which is the cap height of the H. The
+font's cap height is 714 of 1000 units, so the expected value is 71.4 px
+(`calibration/font_metrics.py` prints the font metrics). The script prints the
+measured cap height, the implied em (cap height / 0.714) and the error.
 
-| Tool | Source setting | Output settings | Em label | Dark rows |
-| ---- | -------------- | --------------- | -------- | --------- |
-| Graphviz | 10.5 pt | 96 dpi PNG | 14 px | 10 |
-| PlantUML | 14 | 96 dpi PNG, registered font | 14 px | 10 |
-| D2 | 14 | SVG, librsvg at 1:1 | 14 px | 10 |
+```text
+graphviz cap height  72 px  implied em 100.84 px  error  +0.8 %
+plantuml cap height  71 px  implied em  99.44 px  error  -0.6 %
+d2       cap height  72 px  implied em 100.84 px  error  +0.8 %
+```
 
-Graphviz settings are three quarters of the intended pixel size because 96 dpi
-maps points to pixels by 96/72. PlantUML and D2 settings equal the label in
-these output paths. The labels do not use pixctl's estimate.
+The measurement counts whole pixel rows, so one row in 71 (about 1.4 %) is the
+resolution. At a body size of 14 px that is about 0.2 px. The three tools are
+within one row of the nominal size, so the labels are correct to about that
+precision. They do not use pixctl's estimate. The calibration measures the
+mapping at 100 px and assumes that the tools scale linearly down to the body
+sizes of the corpus; it does not measure each size separately.
 
 ## Evaluation baseline
 

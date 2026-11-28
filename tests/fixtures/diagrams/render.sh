@@ -8,6 +8,9 @@ plant_jar="$(brew --prefix plantuml)/libexec/plantuml.jar"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/pixctl-corpus.XXXXXXXX")
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 mkdir -p "$tmp/cache" "$root/png"
+# Remove the previous outputs so that renamed sources leave no stale images.
+find "$root/png" -type f -delete
+rm -f "$root/manifest.toml"
 # Isolate fontconfig so Graphviz and librsvg resolve the bundled font.
 cat > "$tmp/fonts.conf" <<END
 <?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd">
@@ -25,7 +28,7 @@ for source in "$root"/src/*; do
         *.dot) dot -Tpng "$source" > "$root/png/$base.png" ;;
         *.puml) java -Djava.awt.headless=true -cp "$tmp:$plant_jar" PlantFont "$font" -tpng -pipe < "$source" > "$root/png/$base.png" ;;
         *.d2)
-            d2 --font-regular "$font" --font-bold "$font" --font-semibold "$font" "$source" "$tmp/diagram.svg" >/dev/null 2>&1
+            d2 --font-regular "$font" --font-bold "$font" --font-semibold "$font" "$source" "$tmp/diagram.svg" >/dev/null
             # librsvg cannot use the embedded web font; resolve the same font
             # through the isolated fontconfig configuration instead.
             sed -E 's/font-family: "d2-[0-9]+-font-(regular|bold|semibold)"/font-family: "Noto Sans"/g' "$tmp/diagram.svg" > "$tmp/raster.svg"

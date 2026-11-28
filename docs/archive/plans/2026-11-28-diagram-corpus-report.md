@@ -8,15 +8,17 @@ arrows, titles and legends. The corpus and its integration test are excluded
 from the published crate. `just corpus` regenerates it; CI checks the script
 with shellcheck but does not render the images.
 
-The Noto Sans font has a cap-height ratio of 714 / 1000 = 0.714. At a target 14
-px em size, the calibration images for all three tools have 10 dark rows, which
-implies 14.006 px. Graphviz used 10.5 pt at 96 dpi; PlantUML used size 14 at 96
-dpi; D2 used size 14 in SVG rasterized 1:1 with librsvg. The corpus README
-contains the mappings and calibration details. No label uses pixctl's estimate.
+The Noto Sans font has a cap-height ratio of 714 / 1000 = 0.714.
+`calibration/calibrate.sh` renders the calibration sources at a nominal 100 px
+(Graphviz 75 pt at 96 dpi, PlantUML size 100, D2 font-size 100 rasterized 1:1
+with librsvg) and measures the cap height as 72, 71 and 72 rows. The implied em
+is 100.84, 99.44 and 100.84 px, within 1 % of nominal. The resolution is one row
+in 71 (about 1.4 %, about 0.2 px at 14 px). The corpus README has the output and
+the details. No label uses pixctl's estimate.
 
 Two complete renders with the installed tools produced identical SHA-256 hashes
 for all 288 images and the manifest. The complete corpus directory totals
-5,559,127 bytes.
+5,561,393 bytes.
 
 The evaluation on a copy outside the repository produced:
 
@@ -36,5 +38,6 @@ established.
 
 Validation: `just build` passed, including the corpus integration test, clippy,
 shellcheck and the install test. The package listing excludes the corpus and its
-integration test. The supplied untracked brief was reflowed by prim for the
-formatting gate and remains uncommitted.
+integration test. The supplied brief was reflowed by prim for the formatting
+gate and is committed at
+`docs/archive/specs/2026-11-28-diagram-corpus-brief.md`.

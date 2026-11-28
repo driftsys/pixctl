@@ -43,7 +43,7 @@ test-converter:
 
 # Lint the install scripts.
 shellcheck:
-    shellcheck -x install.sh bootstrap .githooks/pre-push-gate.sh tests/install/install_test.sh tests/fixtures/diagrams/render.sh
+    shellcheck -x install.sh bootstrap .githooks/pre-push-gate.sh tests/install/install_test.sh tests/fixtures/diagrams/render.sh tests/fixtures/diagrams/calibration/calibrate.sh
 
 # Test install.sh against a local fake release (no network).
 install-test:
@@ -86,7 +86,7 @@ build: toolchain-check check fmt-check compile test lint shellcheck install-test
 
 # Regenerate the diagram corpus on macOS; not run by CI.
 corpus:
-    sh tests/fixtures/diagrams/render.sh
+    sh tests/fixtures/diagrams/render.sh tests/fixtures/diagrams/calibration/calibrate.sh
 
 # Private font-size evaluation of a folder of images; prints totals only.
 [no-cd]

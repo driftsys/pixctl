@@ -9,7 +9,10 @@ README section "Evaluating the font estimate".
 
 The font estimate is tuned on synthetic text only. `just eval` measures it on a
 folder of private images that cannot be committed, and prints totals that are
-safe to share. It reports; it never changes the estimator or `K`.
+safe to share. It reports; it never changes the estimator or `K`. A public
+diagram corpus with exact labels exists in `tests/fixtures/diagrams` (no
+accuracy gate yet); the open-licence set of real screenshots in issue #9 is
+still open.
 
 ## Components
 

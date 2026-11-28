@@ -98,10 +98,11 @@ A docs author, or CI, can turn a raster image into a display-correct PNG or WebP
 
 ## Deferred
 
-The public corpus is still not built. A public corpus in `tests/fixtures/real/`
-with a CI gate is a follow-up (issue #9). `just eval DIR [MANIFEST]` now exists
-for private folders: it measures the font estimate and prints totals only (see
-[design/eval.md](../design/eval.md)).
+A public diagram corpus with exact font-size labels exists in
+`tests/fixtures/diagrams`; it has no accuracy gate yet. The open-licence set of
+real screenshots in issue #9 is still open. `just eval DIR [MANIFEST]` now
+exists for private folders: it measures the font estimate and prints totals only
+(see [design/eval.md](../design/eval.md)).
 
 ## Alternatives considered
 
