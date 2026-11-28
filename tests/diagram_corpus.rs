@@ -8,7 +8,7 @@ struct Manifest {
     image: Vec<Entry>,
 }
 
-// Same keys as the eval manifest: exactly `file` and `px`.
+// Each entry has exactly `file` and `px`, a subset of what the eval manifest accepts.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
@@ -75,6 +75,9 @@ fn corpus_manifest_matches_decodable_images() {
     let mut sources = 0;
     for source in std::fs::read_dir(root.join("src")).unwrap() {
         let name = source.unwrap().file_name().into_string().unwrap();
+        if name.starts_with('.') {
+            continue; // render.sh skips dotfiles too
+        }
         let base = name.rsplit_once('.').unwrap().0;
         for output in [
             format!("png/{base}.png"),

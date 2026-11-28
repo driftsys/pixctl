@@ -86,7 +86,8 @@ build: toolchain-check check fmt-check compile test lint shellcheck install-test
 
 # Regenerate the diagram corpus on macOS; not run by CI.
 corpus:
-    sh tests/fixtures/diagrams/render.sh tests/fixtures/diagrams/calibration/calibrate.sh
+    sh tests/fixtures/diagrams/calibration/calibrate.sh
+    sh tests/fixtures/diagrams/render.sh
 
 # Private font-size evaluation of a folder of images; prints totals only.
 [no-cd]

@@ -34,5 +34,6 @@ for tool in graphviz plantuml d2; do
     awk -v tool="$tool" -v rows="$rows" 'BEGIN {
         em = rows / 0.714
         printf "%-8s cap height %3d px  implied em %6.2f px  error %+5.1f %%\n", tool, rows, em, (em - 100)
-    }'
+        if (em < 98.5 || em > 101.5) exit 1
+    }' || { echo "calibration: $tool is more than 1.5 % from nominal" >&2; exit 1; }
 done
