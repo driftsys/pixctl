@@ -1,5 +1,5 @@
 #!/bin/sh
-# Requires macOS with Graphviz, PlantUML, D2, librsvg, ImageMagick and Java.
+# Requires macOS with Homebrew, Graphviz, PlantUML, D2, librsvg, ImageMagick and a Java JDK (javac).
 set -eu
 export LC_ALL=C
 root=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

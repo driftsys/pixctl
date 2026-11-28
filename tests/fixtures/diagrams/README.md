@@ -26,7 +26,7 @@ are excluded from the published crate.
 
 ## Font size calibration
 
-The `calibration/` directory contains the single-line `HHHHHHHH` samples. The
+The `calibration/` directory contains the sources of the single-line `HHHHHHHH` samples; render them by hand with the same tool settings as `render.sh`. The
 font's OS/2 `sCapHeight` is 714 and `head.unitsPerEm` is 1000, as printed by
 `python3 tests/fixtures/diagrams/calibration/font_metrics.py`. Its cap-height
 ratio is therefore 0.714. Each sample was rendered using the same font and
