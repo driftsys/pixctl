@@ -27,8 +27,11 @@ only, so the release build gains no dependency and no C code.
   and prints the survey lines.
 
 The recipe is `just eval DIR MANIFEST=""`. It runs
-`cargo run --quiet --release --locked --example eval` and prints nothing apart
-from the eval output.
+`cargo run --quiet --release --locked --manifest-path <repo>/Cargo.toml --example eval`
+with `RUSTUP_TOOLCHAIN` set to the channel in `rust-toolchain.toml`, because the
+recipe does not change into the repository (`[no-cd]`). It prints nothing apart
+from the eval output. A relative `DIR` or `MANIFEST` resolves against the
+caller's working directory.
 
 ## Modes
 
@@ -105,10 +108,10 @@ failed: read_failed 1
 ## Privacy guarantees
 
 - Only totals are printed. No file name, path, image content or per-image line.
-- Every error is built by the eval from a fixed kind and an entry index, for
-  example `pixctl eval: entry 3: cannot read image`. The text of a `Failure`, a
-  TOML error or an I/O error is never printed. A TOML error prints only its line
-  number.
+- Every error is built by the eval as fixed text, with an entry index where one
+  applies, for example `pixctl eval: entry 3: cannot read image`. The text of a
+  `Failure`, a TOML error or an I/O error is never printed. A TOML error prints
+  only its line number.
 - Repository guard: before anything is read, `DIR` is canonicalized and refused
   when it is the repository root (`CARGO_MANIFEST_DIR`, canonicalized) or inside
   it, with
@@ -126,8 +129,8 @@ failed: read_failed 1
 - `1` — labelled only: the limit is not met, or there is no confident sample.
 - `2` — operational error: missing `DIR` argument (usage text), unreadable
   `DIR`, `DIR` inside the repository, unreadable or invalid manifest, or an
-  image that cannot be read in labelled mode. In survey mode an image that fails
-  to load is counted, not fatal.
+  image that cannot be read in labelled mode, or a report that cannot be
+  written. In survey mode an image that fails to load is counted, not fatal.
 
 ## Testing
 

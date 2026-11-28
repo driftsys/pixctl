@@ -574,7 +574,8 @@ can be shared when the images cannot.
 the repository or a folder inside it, prints
 `pixctl eval: DIR is inside the pixctl repository; keep private images outside it`
 and exits with `2`, before it reads anything. It also exits with `2` when `DIR`
-cannot be read.
+cannot be read or when the report cannot be written. A relative `DIR` or
+`MANIFEST` resolves against the directory you run `just` from.
 
 ### Labelled run
 

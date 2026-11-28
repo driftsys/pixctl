@@ -127,16 +127,21 @@ fn measure(path: &Path) -> Outcome {
     };
     let (w, h) = loaded.rgba.dimensions();
     let est = estimate(&flatten_to_gray(&loaded.rgba));
-    let rule = match plan(w, h, usable_px(est.px, est.confidence)).rule {
+    let rule = rule_slot(plan(w, h, usable_px(est.px, est.confidence)).rule);
+    Outcome::Measured {
+        confident: est.confidence == Confidence::High && est.px.is_some(),
+        rule,
+    }
+}
+
+/// The index of a rule in the survey's counters.
+fn rule_slot(rule: Rule) -> usize {
+    match rule {
         Rule::Icon => 0,
         Rule::Unchanged => 1,
         Rule::Upscale => 2,
         Rule::TooSmall => 3,
         Rule::Oversize => 4,
-    };
-    Outcome::Measured {
-        confident: est.confidence == Confidence::High && est.px.is_some(),
-        rule,
     }
 }
 
@@ -270,6 +275,35 @@ mod tests {
 
     #[test]
     fn rules_land_in_their_own_counters() {
+        // Real images cannot reach every rule, so the outcomes are injected:
+        // 1 icon, 2 unchanged, 3 upscale, 4 too-small, 5 oversize.
+        let rules = [
+            (Rule::Icon, 1),
+            (Rule::Unchanged, 2),
+            (Rule::Upscale, 3),
+            (Rule::TooSmall, 4),
+            (Rule::Oversize, 5),
+        ];
+        let paths: Vec<PathBuf> = rules
+            .iter()
+            .flat_map(|&(rule, n)| (0..n).map(move |i| PathBuf::from(format!("{rule:?}{i}"))))
+            .collect();
+        let s = run_with(&paths, &mut Vec::new(), |p| {
+            let name = p.to_str().unwrap();
+            let (rule, _) = *rules
+                .iter()
+                .find(|(r, _)| name.starts_with(&format!("{r:?}")))
+                .unwrap();
+            Outcome::Measured {
+                confident: false,
+                rule: rule_slot(rule),
+            }
+        });
+        assert_eq!(s.rules, [1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn real_images_reach_their_rules() {
         let dir = TempDir::new().unwrap();
         for (name, w, h) in [("icon", 32, 32), ("plain", 300, 200), ("wide", 800, 100)] {
             image::RgbaImage::new(w, h)
@@ -278,8 +312,23 @@ mod tests {
         }
         let (paths, _) = collect(dir.path()).unwrap();
         let s = run(&paths, &mut Vec::new());
-        // icon, unchanged, upscale, too-small, oversize.
         assert_eq!(s.rules, [1, 1, 0, 0, 1]);
+    }
+
+    #[test]
+    fn low_confidence_estimate_is_not_counted_confident() {
+        let dir = TempDir::new().unwrap();
+        render_text(&TextSpec {
+            face: Face::DejaVu,
+            em_px: 14.0,
+            lines: 2,
+            invert: false,
+        })
+        .save(dir.path().join("t.png"))
+        .unwrap();
+        let (paths, _) = collect(dir.path()).unwrap();
+        let s = run(&paths, &mut Vec::new());
+        assert_eq!((s.images, s.confident), (1, 0));
     }
 
     #[test]
