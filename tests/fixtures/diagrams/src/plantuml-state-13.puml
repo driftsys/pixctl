@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 13
+skinparam dpi 96
+skinparam shadowing false
+skinparam titleFontName Noto Sans
+skinparam titleFontSize 16
+title State overview
+state "Receive request" as A
+state "Validate fields" as B
+state "Prepare result" as C
+state "Close request" as D
+A --> B: received
+B --> C: accepted
+C --> D: complete
+D --> A: next request
+@enduml

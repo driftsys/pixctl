@@ -1,0 +1,10 @@
+direction: right
+header: Flow overview {shape: text; style.font-size: 19}
+a: "Read input\nValidate fields\nRecord request" {style.font-size: 16}
+b: "Prepare data\nApply policy\nStore result" {shape: diamond; style.font-size: 16}
+c: "Review output\nNotify client\nClose request" {style.font-size: 16}
+d: Status {style.font-size: 16}
+a -> b: accepted {style.font-size: 16}
+b -> c: processed {style.font-size: 16}
+c -> d: complete {style.font-size: 16}
+legend: "Legend: normal path" {shape: text; style.font-size: 14}

@@ -1,0 +1,16 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 13
+skinparam dpi 96
+skinparam shadowing false
+skinparam titleFontName Noto Sans
+skinparam titleFontSize 16
+title Sequence overview
+participant "Input service" as A
+participant "Policy service" as B
+participant "Output service" as C
+A -> B: Validate request
+B -> C: Apply policy
+C -> A: Return result
+A -> B: Confirm status
+@enduml

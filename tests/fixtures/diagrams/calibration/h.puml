@@ -1,0 +1,6 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 14
+skinparam dpi 96
+:HHHHHHHH;
+@enduml

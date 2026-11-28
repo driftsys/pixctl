@@ -1,0 +1,13 @@
+@startuml
+skinparam defaultFontName Noto Sans
+skinparam defaultFontSize 8
+skinparam dpi 96
+skinparam shadowing false
+skinparam titleFontName Noto Sans
+skinparam titleFontSize 11
+title Short flow
+start
+:Read;
+:Write;
+stop
+@enduml
