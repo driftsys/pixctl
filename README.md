@@ -560,6 +560,115 @@ written, or when the output directory cannot be created; in the last case no
 image is written, and the envelope has empty `results` and one `out_dir_failed`
 error. It is `0` otherwise.
 
+## Evaluating the font estimate
+
+`just eval` measures how well the font size estimate works on a folder of your
+own images. It is a private tool for people who work on pixctl: it is a Cargo
+example, it is not part of the released `pixctl` binary, and
+`cargo install
+pixctl` does not install it. It never prints a file name, a path,
+image content or a line per image. Its output holds totals only, so the result
+can be shared when the images cannot.
+
+`DIR` must be outside the pixctl repository. The tool refuses a `DIR` that is
+the repository or a folder inside it, prints
+`pixctl eval: DIR is inside the pixctl repository; keep private images outside it`
+and exits with `2`, before it reads anything. It also exits with `2` when `DIR`
+cannot be read or when the report cannot be written. A relative `DIR` or
+`MANIFEST` resolves against the directory you run `just` from.
+
+### Labelled run
+
+```sh
+just eval DIR MANIFEST
+```
+
+The manifest is a TOML file with one `[[image]]` table per labelled image. Each
+entry has a `file`, relative to `DIR`, and the label: the font size of the text
+in the image, in pixels. Give the label in one of two forms:
+
+```toml
+[[image]]
+file = "login.png"
+px = 14
+
+[[image]]
+file = "sub/settings.png"
+pt = 10.5
+scale = 1.0
+```
+
+- `px`: the font size in pixels, used as it is.
+- `pt` with `scale`: the font size in points and the factor by which the image
+  was scaled when it was taken. The label is `px = pt × 96 ÷ 72 × scale`. The
+  second entry above is `10.5 × 96 ÷ 72 × 1.0 = 14` px.
+
+An entry must have exactly one of the two forms. All values must be positive
+numbers. An absolute `file` is an error. Keys that the tool does not know are
+ignored. A manifest with no entry is an error.
+
+The tool estimates the font size of every labelled image and prints four lines:
+
+```console
+$ just eval ~/shots ~/shots-labels.toml
+images: 4 (confident 4, review 0 = 0.0 %)
+error on confident: mean 0.6 px, p95 0.7 px
+confidently wrong (> 2 px): 0 of 4 = 0.0 % (limit 2 %)  PASS
+K interval for ±1.5 px on all labelled images (n = 4): 0.906–1.094 (current K 1.045, inside)
+```
+
+- An image is confident when the estimate has `high` confidence and a font size.
+  The other images are counted as `review`.
+- An image is confidently wrong when it is confident and the estimate differs
+  from the label by more than 2 px. The limit is that fewer than 2 % of the
+  confident images are confidently wrong; 1 of 50 is exactly 2 % and fails.
+- The `K` line gives the range of the calibration constant `K` for which every
+  labelled image that has an estimate has an error of at most 1.5 px, and
+  whether the current `K` (see
+  [AD-0011](docs/decisions/0011-k-calibration-rule.md)) is `inside` or `outside`
+  that range. `n` is the number of images that have an estimate. The range reads
+  `none (no single K fits)` when no value of `K` fits all of those images, and
+  `none (no image has an estimate)` when `n` is 0.
+- When no image is confident, the error line and the wrong line print `n/a`, and
+  the wrong line ends with `FAIL`.
+
+The exit code is `0` when the limit is met, `1` when it is not met, and `2` for
+an operational error: an unreadable `DIR` or manifest, an invalid manifest, or
+an image that cannot be read. The error text is fixed text and the number of the
+entry (counted from 1), for example `pixctl eval: entry 2: cannot read image`.
+For invalid TOML, the text gives only the line number. It never gives the file
+name or the text of a lower-level error.
+
+### Survey
+
+```sh
+just eval DIR
+```
+
+Without a manifest, the tool surveys every image below `DIR`, including
+subfolders and without following symbolic links. It reads the extensions `png`,
+`jpg`, `jpeg`, `gif`, `bmp`, `tif`, `tiff`, `webp`, `emf` and `wmf`, in any
+case, and counts `.svg` files without reading them. The survey needs no labels:
+it counts how many images have a confident estimate and how many images fall
+under each fit rule. The progress count `done/total` goes to stderr, and the
+report goes to stdout:
+
+```console
+$ just eval ~/shots
+5/5
+images: 5 (skipped SVG: 1)
+confident: 4 (80.0 %)
+rules: icon 0, unchanged 4, upscale 0, too-small 0, oversize 0
+failed: read_failed 1
+```
+
+The `failed` line counts the images that could not be loaded, by the error codes
+in [Error codes](#error-codes). It adds `panicked` for an image that made a
+decoder panic; the survey continues with the next image. It reads `failed: 0`
+when every image loaded. The survey exits with `0` unless an operational error
+stops it, such as an unreadable `DIR`; images that fail to load do not change
+the exit code.
+
 ## License
 
 MIT

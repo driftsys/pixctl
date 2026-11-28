@@ -98,7 +98,10 @@ A docs author, or CI, can turn a raster image into a display-correct PNG or WebP
 
 ## Deferred
 
-The public corpus with `just eval` is a follow-up and is not built.
+The public corpus is still not built. A public corpus in `tests/fixtures/real/`
+with a CI gate is a follow-up (issue #9). `just eval DIR [MANIFEST]` now exists
+for private folders: it measures the font estimate and prints totals only (see
+[design/eval.md](../design/eval.md)).
 
 ## Alternatives considered
 
